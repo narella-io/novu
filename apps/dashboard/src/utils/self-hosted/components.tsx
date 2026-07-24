@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/correctness/useUniqueElementIds: expected */
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/primitives/button';
 import { Input } from '../../components/primitives/input';
 import { API_HOSTNAME } from '../../config';
@@ -20,97 +20,48 @@ export function UserProfile() {
 }
 
 export function SignIn() {
+  // narella: Google OAuth is the only login path in this fork. The API's
+  // /v1/auth/google/callback redirects back here with ?token= (success) or
+  // ?error= (rejected/not allowlisted); ingest mirrors the upstream
+  // password flow (localStorage JWT + Clerk.loggedIn shim).
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setIsLoading(true);
+  useEffect(() => {
+    const token = searchParams.get('token');
+    const authError = searchParams.get('error');
 
-    try {
-      const response = await fetch(`${API_HOSTNAME}/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      if (data.data.token) {
-        localStorage.setItem(JWT_STORAGE_KEY, data.data.token);
-        (window as any).Clerk = { ...((window as any).Clerk || {}), loggedIn: true };
-        navigate('/');
-      } else {
-        throw new Error('No token received');
-      }
-    } catch (e: any) {
-      setError(e.message || 'An unexpected error occurred.');
-    } finally {
-      setIsLoading(false);
+    if (token) {
+      localStorage.setItem(JWT_STORAGE_KEY, token);
+      (window as any).Clerk = { ...((window as any).Clerk || {}), loggedIn: true };
+      navigate('/');
+      return;
     }
+
+    if (authError) {
+      setError(
+        authError === 'AuthenticationError'
+          ? 'This Google account is not authorized for the Narella Novu dashboard.'
+          : authError
+      );
+    }
+  }, [searchParams, navigate]);
+
+  const signInWithGoogle = () => {
+    const state = encodeURIComponent(JSON.stringify({ source: 'web', isLoginPage: true }));
+    window.location.href = `${API_HOSTNAME}/v1/auth/google?state=${state}`;
   };
 
   return (
     <div className="mx-auto w-full max-w-md pt-12">
       <h2 className="mb-6 text-center text-xl font-semibold">Sign In</h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
-            Email
-          </label>
-          <Input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            required
-            className="w-full"
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <Input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            className="w-full"
-          />
-        </div>
+      <div className="space-y-6">
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={isLoading} variant="primary" mode="filled" className="w-full">
-          {isLoading ? 'Signing In...' : 'Sign In'}
+        <Button type="button" onClick={signInWithGoogle} variant="primary" mode="filled" className="w-full">
+          Sign in with Google
         </Button>
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Don&apos;t have an account?{' '}
-          <span
-            role="button"
-            tabIndex={0}
-            className="text-primary-base focus:ring-primary-base/50 cursor-pointer font-medium hover:underline focus:outline-hidden focus:ring-2"
-            onClick={() => navigate('/auth/sign-up')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') navigate('/auth/sign-up');
-            }}
-          >
-            Sign Up
-          </span>
-        </p>
-      </form>
+      </div>
     </div>
   );
 }
