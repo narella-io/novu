@@ -92,16 +92,13 @@ export class AuthController {
   // NOT use buildOauthRedirectUrl — that targets /auth/login, a route that
   // does not exist in the v3 community dashboard; /auth/sign-in ingests the
   // token (see apps/dashboard utils/self-hosted).
+  // Guard (not middleware) starts the OAuth dance: Nest middleware with
+  // string paths does not reliably match the /v1 global prefix, so the
+  // upstream GitHub middleware pattern never fires; AuthGuard runs on the
+  // resolved route and lets passport issue the Google redirect.
   @Get('/google')
+  @UseGuards(AuthGuard('google'))
   googleAuth() {
-    this.logger.trace('Checking Google Auth');
-
-    if (!process.env.GOOGLE_OAUTH_CLIENT_ID || !process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
-      throw new BadRequestException(
-        'Google auth is not configured, please provide GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET as env variables'
-      );
-    }
-
     return {
       success: true,
     };

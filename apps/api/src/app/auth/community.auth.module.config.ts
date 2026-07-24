@@ -95,17 +95,4 @@ export function configure(consumer: MiddlewareConsumer) {
       });
   }
 
-  if (process.env.GOOGLE_OAUTH_CLIENT_ID) {
-    consumer
-      .apply(
-        passport.authenticate(AuthProviderEnum.GOOGLE, {
-          session: false,
-          scope: ['profile', 'email'],
-        })
-      )
-      .forRoutes({
-        path: '/auth/google',
-        method: RequestMethod.GET,
-      });
-  }
 }
