@@ -10,6 +10,7 @@ export class SESHandler extends BaseEmailHandler {
   buildProvider(credentials: ICredentials & IConfigurations, from?: string) {
     const config: SESConfig = {
       region: credentials.region as string,
+      useWorkloadIdentity: credentials.useWorkloadIdentity,
       accessKeyId: credentials.apiKey as string,
       secretAccessKey: credentials.secretKey as string,
       senderName: credentials.senderName ?? 'no-reply',

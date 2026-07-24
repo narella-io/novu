@@ -24,11 +24,14 @@ export class SESEmailProvider extends BaseProvider implements IEmailProvider {
 
   constructor(private readonly config: SESConfig) {
     super();
-    // narella: blank keys -> AWS SDK default credential chain (IRSA on EKS).
-    // Static keys still work when provided.
+    // narella: two auth modes — workload identity (pod IAM role via the AWS
+    // SDK default chain; also used when keys are simply blank) or a static
+    // key pair.
+    const useKeys =
+      !this.config.useWorkloadIdentity && this.config.accessKeyId && this.config.secretAccessKey;
     this.sesClient = new SESv2Client({
       region: this.config.region,
-      ...(this.config.accessKeyId && this.config.secretAccessKey
+      ...(useKeys
         ? {
             credentials: {
               accessKeyId: this.config.accessKeyId,

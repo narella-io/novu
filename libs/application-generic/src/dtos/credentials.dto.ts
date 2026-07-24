@@ -50,6 +50,12 @@ export class CredentialsDto implements ICredentials {
   secure?: boolean;
 
   @ApiPropertyOptional()
+  @TransformToBoolean()
+  @IsBoolean()
+  @IsOptional()
+  useWorkloadIdentity?: boolean;
+
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   region?: string;

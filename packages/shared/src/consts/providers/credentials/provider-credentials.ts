@@ -296,17 +296,24 @@ export const sendinblueConfig: IConfigCredential[] = [
 ];
 
 export const sesConfig: IConfigCredential[] = [
-  // narella: keys optional — blank uses the pod's IAM role (IRSA/workload
-  // identity) via the AWS SDK default chain.
+  // narella: explicit two-mode auth — workload identity (pod IAM role via
+  // the AWS SDK default chain) OR a static key pair. The api validates that
+  // exactly one mode is satisfied.
+  {
+    key: CredentialsKeyEnum.UseWorkloadIdentity,
+    displayName: 'Use workload identity (pod IAM role — no keys)',
+    type: 'switch',
+    required: false,
+  },
   {
     key: CredentialsKeyEnum.ApiKey,
-    displayName: 'Access key ID (blank = IAM role)',
+    displayName: 'Access key ID (leave blank with workload identity)',
     type: 'string',
     required: false,
   },
   {
     key: CredentialsKeyEnum.SecretKey,
-    displayName: 'Secret access key (blank = IAM role)',
+    displayName: 'Secret access key (leave blank with workload identity)',
     type: 'string',
     required: false,
   },

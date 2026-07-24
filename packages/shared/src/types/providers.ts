@@ -9,6 +9,8 @@ export enum CredentialsKeyEnum {
   Host = 'host',
   Port = 'port',
   Secure = 'secure',
+  // narella: keyless cloud auth (IRSA/workload identity) toggle
+  UseWorkloadIdentity = 'useWorkloadIdentity',
   Region = 'region',
   AccountSid = 'accountSid',
   MessageProfileId = 'messageProfileId',

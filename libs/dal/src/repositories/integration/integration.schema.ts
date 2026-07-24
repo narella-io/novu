@@ -34,6 +34,7 @@ const integrationSchema = new Schema<IntegrationDBModel>(
       host: Schema.Types.String,
       port: Schema.Types.String,
       secure: Schema.Types.Boolean,
+      useWorkloadIdentity: Schema.Types.Boolean,
       region: Schema.Types.String,
       accountSid: Schema.Types.String,
       messageProfileId: Schema.Types.String,

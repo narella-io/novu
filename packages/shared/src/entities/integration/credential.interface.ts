@@ -7,6 +7,7 @@ export interface ICredentials {
   host?: string;
   port?: string;
   secure?: boolean;
+  useWorkloadIdentity?: boolean;
   region?: string;
   accountSid?: string;
   messageProfileId?: string;

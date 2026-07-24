@@ -1,4 +1,5 @@
 export interface SESConfig {
+  useWorkloadIdentity?: boolean;
   from: string;
   region: string;
   senderName: string;
