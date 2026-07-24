@@ -35,5 +35,5 @@ upgrades are cherry-picks onto a new tag branch:
     pnpm install --ignore-scripts    # once; NODE_OPTIONS=--max-old-space-size=8192 if OOM
     ./scripts/narella-build-and-push.sh v3.18.0-narella.N
 
-api+dashboard build from the fork; worker/ws mirror upstream (no patches touch them);
+api+dashboard+worker build from the fork (worker carries the SES-IRSA provider); ws mirrors upstream;
 narella-mcp builds separately from narella-mcp/Dockerfile.

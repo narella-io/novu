@@ -27,6 +27,7 @@ trap 'rm -f "$EMPTY_SECRET"' EXIT
 
 # Upstream CI does this copy before building (see .github/workflows/deploy.yml):
 cp scripts/dotenvcreate.mjs apps/api/src/dotenvcreate.mjs
+cp scripts/dotenvcreate.mjs apps/worker/src/dotenvcreate.mjs
 
 echo "=== building ${PREFIX}-api:${TAG} (fork: de-brand + Google OAuth + telemetry) ==="
 pnpm --silent --workspace-root pnpm-context -- apps/api/Dockerfile | docker buildx build \
@@ -47,8 +48,17 @@ docker buildx build \
   --push \
   "$ROOT"
 
-echo "=== mirroring upstream worker/ws ${UPSTREAM_TAG} (no narella patches touch them) ==="
-for svc in worker ws; do
+echo "=== building ${PREFIX}-worker:${TAG} (fork: SES IRSA provider) ==="
+pnpm --silent --workspace-root pnpm-context -- apps/worker/Dockerfile | docker buildx build \
+  --platform linux/amd64 \
+  --secret "id=BULL_MQ_PRO_NPM_TOKEN,src=${EMPTY_SECRET}" \
+  --build-arg PACKAGE_PATH=apps/worker \
+  -t "${PREFIX}-worker:${TAG}" \
+  --push \
+  -
+
+echo "=== mirroring upstream ws ${UPSTREAM_TAG} (no narella patches touch it) ==="
+for svc in ws; do
   docker pull --platform linux/amd64 "ghcr.io/novuhq/novu/${svc}:${UPSTREAM_TAG}"
   docker tag "ghcr.io/novuhq/novu/${svc}:${UPSTREAM_TAG}" "${PREFIX}-${svc}:${TAG}"
   docker push "${PREFIX}-${svc}:${TAG}"
