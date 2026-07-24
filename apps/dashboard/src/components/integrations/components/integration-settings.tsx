@@ -6,6 +6,7 @@ import {
   IProviderConfig,
   PermissionsEnum,
   slackConfig,
+  EmailProviderIdEnum,
 } from '@novu/shared';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -101,7 +102,10 @@ export function IntegrationSettings({
           identifier: generateSlug(provider?.displayName ?? ''),
           active: true,
           primary: true,
-          credentials: {},
+          // narella: SES defaults to workload identity (pod IAM role).
+          credentials: (provider?.id === EmailProviderIdEnum.SES
+            ? { [CredentialsKeyEnum.UseWorkloadIdentity]: true }
+            : {}) as unknown as Record<string, string>,
           configurations: {},
           environmentId: currentEnvironment?._id ?? '',
         },
@@ -121,6 +125,10 @@ export function IntegrationSettings({
   }, [formState.isValid, formState.errors, formState.isDirty, onFormStateChange]);
 
   const name = useWatch({ control, name: 'name' });
+  const sesUseWorkloadIdentity = useWatch({
+    control,
+    name: `credentials.${CredentialsKeyEnum.UseWorkloadIdentity}`,
+  });
   const environmentId = useWatch({ control, name: 'environmentId' });
 
   useEffect(() => {
@@ -183,14 +191,23 @@ export function IntegrationSettings({
       }
     }
 
-    const visibleCredentials = credentials.filter((credential) => credential.hidden !== true);
+    let visibleCredentials = credentials.filter((credential) => credential.hidden !== true);
+
+    // narella: with workload identity ON, the static key fields are
+    // irrelevant — hide them entirely (the api rejects mixed modes anyway).
+    if (provider.id === EmailProviderIdEnum.SES && sesUseWorkloadIdentity) {
+      visibleCredentials = visibleCredentials.filter(
+        (credential) =>
+          credential.key !== CredentialsKeyEnum.ApiKey && credential.key !== CredentialsKeyEnum.SecretKey
+      );
+    }
 
     if (isAgentOnboarding) {
       return visibleCredentials.filter((credential) => credential.key !== CredentialsKeyEnum.RedirectUrl);
     }
 
     return visibleCredentials;
-  }, [provider.id, provider.credentials, mode, integration?.credentials, isAgentOnboarding]);
+  }, [provider.id, provider.credentials, mode, integration?.credentials, isAgentOnboarding, sesUseWorkloadIdentity]);
 
   return (
     <Form {...form}>
