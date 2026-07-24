@@ -11,7 +11,6 @@ import { Plug } from '../icons/plug';
 import { ShieldZap } from '../icons/shield-zap';
 import { Sparkling } from '../icons/sparkling';
 import { AuthFeatureRow } from './auth-feature-row';
-import { TrustedCompanies } from './trusted-companies';
 
 export type AuthSideBannerVariant = 'default' | 'agents';
 
@@ -120,25 +119,6 @@ export function AuthSideBanner({ variant }: AuthSideBannerProps) {
           />
         </div>
       )}
-      {IS_SELF_HOSTED_CE && (
-        <div className="border-stroke-soft rounded-8 hidden flex-col items-start justify-start gap-3 self-stretch border from-blue-50/80 to-transparent p-6 shadow-md md:flex">
-          <h3 className="text-lg font-semibold text-neutral-900">Looking for a Managed Solution?</h3>
-          <p className="text-sm text-neutral-600">
-            Explore Novu Cloud for a fully managed experience with dedicated support, advanced features, and seamless
-            scalability.
-          </p>
-          <Button
-            variant="primary"
-            className="mt-2 w-full sm:w-auto"
-            onClick={() => openInNewTab(SELF_HOSTED_UPGRADE_REDIRECT_URL + '?utm_campaign=auth_banner_contact_sales')}
-          >
-            Learn More
-          </Button>
-        </div>
-      )}
-      <div className="hidden md:block">
-        <TrustedCompanies />
-      </div>
     </div>
   );
 }
@@ -219,9 +199,6 @@ function AgentsSideBanner() {
           <BannerPill icon={<MessagesSquare className="size-3 text-[#99a0ae]" />}>5</BannerPill> and state via unified
           agent() handler.
         </AgentsCheckRow>
-      </div>
-      <div className="hidden md:block">
-        <TrustedCompanies label="TRUSTED BY TEAMS AT" />
       </div>
     </div>
   );
