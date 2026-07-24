@@ -296,17 +296,19 @@ export const sendinblueConfig: IConfigCredential[] = [
 ];
 
 export const sesConfig: IConfigCredential[] = [
+  // narella: keys optional — blank uses the pod's IAM role (IRSA/workload
+  // identity) via the AWS SDK default chain.
   {
     key: CredentialsKeyEnum.ApiKey,
-    displayName: 'Access key ID',
+    displayName: 'Access key ID (blank = IAM role)',
     type: 'string',
-    required: true,
+    required: false,
   },
   {
     key: CredentialsKeyEnum.SecretKey,
-    displayName: 'Secret access key',
+    displayName: 'Secret access key (blank = IAM role)',
     type: 'string',
-    required: true,
+    required: false,
   },
   {
     key: CredentialsKeyEnum.Region,
