@@ -107,7 +107,9 @@ export class AuthController {
   @Get('/google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() request, @Res() response) {
-    const base = `${process.env.DASHBOARD_URL || process.env.FRONT_BASE_URL}/auth/sign-in`;
+    // FRONT_BASE_URL first: the bundled .env defaults DASHBOARD_URL to Novu's
+    // cloud dashboard, which must never receive our tokens.
+    const base = `${process.env.FRONT_BASE_URL || process.env.DASHBOARD_URL}/auth/sign-in`;
 
     if (!request.user || !request.user.token) {
       return response.redirect(`${base}?error=AuthenticationError`);
