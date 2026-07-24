@@ -268,7 +268,13 @@ export const LegacySideNavigation = () => {
                     <span>API Keys</span>
                   </NavigationLink>
                 </Protect>
-                <NavigationLink to={ROUTES.MCP_SERVER}>
+                <NavigationLink
+                  to={
+                    currentEnvironment?.slug
+                      ? buildRoute(ROUTES.MCP_SERVER, { environmentSlug: currentEnvironment?.slug ?? '' })
+                      : undefined
+                  }
+                >
                   <RiSparklingLine className="size-4" />
                   <span>MCP Server</span>
                 </NavigationLink>

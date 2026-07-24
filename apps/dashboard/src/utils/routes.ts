@@ -18,7 +18,7 @@ export const ROUTES = {
   CLI_AUTH: '/cli/auth',
   CONNECT_CLAIM: '/connect/claim',
   ENV: '/env',
-  MCP_SERVER: '/mcp-server',
+  MCP_SERVER: '/env/:environmentSlug/mcp-server',
   SETTINGS: '/settings',
   SETTINGS_ACCOUNT: '/settings/account',
   SETTINGS_ORGANIZATION: '/settings/organization',
