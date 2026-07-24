@@ -339,6 +339,10 @@ export function IntegrationSettings({
                             control={control}
                             isReadOnly={isReadOnly}
                             integrationId={integration?._id}
+                            awsRegionTypeahead={
+                              (provider.id === EmailProviderIdEnum.SES || provider.id === SmsProviderIdEnum.SNS) &&
+                              credential.key === CredentialsKeyEnum.Region
+                            }
                           />
                         ))}
                       </div>

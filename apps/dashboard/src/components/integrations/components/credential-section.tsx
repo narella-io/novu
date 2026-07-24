@@ -1,4 +1,17 @@
 import { CredentialsKeyEnum, IConfigCredential } from '@novu/shared';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { get } from '../../../api/api.client';
+import { Button } from '@/components/primitives/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/primitives/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/primitives/popover';
 import { ReactNode } from 'react';
 import { Control, ControllerFieldState, ControllerRenderProps } from 'react-hook-form';
 import { CopyButton } from '@/components/primitives/copy-button';
@@ -344,6 +357,77 @@ function InputControl({
   return <TextInputControl credential={credential} field={field} fieldState={fieldState} isReadOnly={isReadOnly} />;
 }
 
+// narella: AWS region typeahead — live list from the api (which pings AWS's
+// public ip-ranges.json daily), with a static fallback so the field always works.
+const AWS_REGION_FALLBACK = [
+  'ap-northeast-1', 'ap-south-1', 'ap-southeast-1', 'ap-southeast-2',
+  'ca-central-1', 'eu-central-1', 'eu-north-1', 'eu-west-1', 'eu-west-2',
+  'eu-west-3', 'sa-east-1', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+];
+
+function AwsRegionCombobox({
+  credential,
+  field,
+  isReadOnly,
+  tooltip,
+}: {
+  credential: IConfigCredential;
+  field: ControllerRenderProps<IntegrationFormData>;
+  isReadOnly?: boolean;
+  tooltip?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const { currentEnvironment } = useEnvironment();
+  const { data } = useQuery({
+    queryKey: ['aws-regions'],
+    queryFn: () => get<{ data: string[] }>('/integrations/aws/regions', { environment: currentEnvironment }),
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+  });
+  const regions = data?.data?.length ? data.data : AWS_REGION_FALLBACK;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <FormLabel credential={credential} tooltip={tooltip} />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="secondary"
+            mode="outline"
+            disabled={isReadOnly}
+            className="w-full justify-start font-normal"
+          >
+            {(field.value as string) || 'Select a region…'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[320px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search regions…" />
+            <CommandList>
+              <CommandEmpty>No region found.</CommandEmpty>
+              <CommandGroup>
+                {regions.map((region) => (
+                  <CommandItem
+                    key={region}
+                    value={region}
+                    onSelect={(value) => {
+                      field.onChange(value);
+                      setOpen(false);
+                    }}
+                  >
+                    {region}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export function CredentialSection({
   credential,
   control,
@@ -352,6 +436,7 @@ export function CredentialSection({
   disabledSwitchMessage,
   name = 'credentials',
   integrationId,
+  awsRegionTypeahead,
 }: {
   credential: IConfigCredential;
   control: Control<IntegrationFormData>;
@@ -360,6 +445,7 @@ export function CredentialSection({
   disabledSwitchMessage?: string;
   name?: 'credentials' | 'configurations';
   integrationId?: string;
+  awsRegionTypeahead?: boolean;
 }) {
   return (
     <FormField
@@ -378,6 +464,18 @@ export function CredentialSection({
       }}
       render={({ field, fieldState }) => (
         <FormItem className="mb-2">
+          {awsRegionTypeahead ? (
+            <AwsRegionCombobox
+              credential={credential}
+              field={field}
+              isReadOnly={isReadOnly}
+              tooltip={
+                credential.tooltip?.text ? (
+                  <DescriptionWithLinks description={credential.tooltip?.text} links={credential.links} />
+                ) : undefined
+              }
+            />
+          ) : (
           <InputControl
             credential={credential}
             field={field}
@@ -392,6 +490,7 @@ export function CredentialSection({
               ) : undefined
             }
           />
+          )}
 
           <FormMessage>
             {fieldState.error?.message ||
