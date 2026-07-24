@@ -554,6 +554,27 @@ const novuServiceTiers: Record<FeatureNameEnum, Record<ApiServiceLevelEnum, Feat
   },
 };
 
+// narella: this fork runs ONLY self-hosted (Narella). Self-hosted CE organizations default to
+// ApiServiceLevelEnum.FREE (see CreateOrganization usecase), which the upstream table restricts.
+// Remap every tier column to the UNLIMITED column so ALL tier gates resolve to the highest tier
+// for every org: API-side 402s (ProductFeatureInterceptor via productFeatureEnabledForServiceLevel,
+// ResourceValidatorService, TierRestrictionsValidateUsecase, resolveTierLimit) and dashboard reads
+// (getFeatureForTier / AsBoolean / AsNumber / AsText) all consult this table.
+// Identity/pricing rows are left untouched — they label plans, they gate nothing.
+const narellaIdentityRows: FeatureNameEnum[] = [
+  FeatureNameEnum.TIERS_ORDER_INDEX,
+  FeatureNameEnum.PLATFORM_PLAN_LABEL,
+  FeatureNameEnum.PLATFORM_MONTHLY_COST,
+  FeatureNameEnum.PLATFORM_ANNUAL_COST,
+];
+for (const narellaFeatureName of Object.values(FeatureNameEnum)) {
+  if (narellaIdentityRows.includes(narellaFeatureName)) continue;
+  const narellaRow = novuServiceTiers[narellaFeatureName];
+  for (const narellaTier of Object.values(ApiServiceLevelEnum)) {
+    narellaRow[narellaTier] = narellaRow[ApiServiceLevelEnum.UNLIMITED];
+  }
+}
+
 export function isDetailedPriceListItem(item: FeatureValue): item is DetailedPriceListItem {
   return (
     item !== null &&
