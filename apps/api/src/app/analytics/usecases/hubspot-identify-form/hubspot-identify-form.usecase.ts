@@ -19,6 +19,10 @@ export class HubspotIdentifyFormUsecase {
   }
 
   async execute(command: HubspotIdentifyFormCommand) {
+    // narella: telemetry-neutered fork — never submit user PII to Novu's
+    // HubSpot portal (upstream hardcodes the portal/form IDs above).
+    return;
+
     try {
       const hubspotSubmitUrl = `https://api.hsforms.com/submissions/v3/integration/submit/${this.hubspotPortalId}/${this.hubspotFormId}`;
 
