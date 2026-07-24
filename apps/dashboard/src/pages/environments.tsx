@@ -5,7 +5,6 @@ import { DashboardLayout } from '../components/dashboard-layout';
 import { CreateEnvironmentButton } from '../components/environments/create-environment-button';
 import { FreeTierState } from '../components/environments/environments-free-state';
 import { EnvironmentsList } from '../components/environments/environments-list';
-import { IS_SELF_HOSTED_CE } from '../config';
 import { useAuth } from '../context/auth/hooks';
 import { useFetchEnvironments } from '../context/environment/hooks';
 import { useFetchSubscription } from '../hooks/use-fetch-subscription';
@@ -27,7 +26,8 @@ export function EnvironmentsPage() {
   const isTrialActive = subscription?.trial?.isActive;
   const allowedToAccessEnvironments =
     areEnvironmentsInitialLoading || !subscription || (isTierEligibleForCustomEnvironments && !isTrialActive);
-  const canAccessEnvironments = allowedToAccessEnvironments && !IS_SELF_HOSTED_CE;
+  // narella: self-hosted CE is fully unlocked — show the create-environment UI, not the upsell.
+  const canAccessEnvironments = allowedToAccessEnvironments;
 
   useEffect(() => {
     track(TelemetryEvent.ENVIRONMENTS_PAGE_VIEWED);

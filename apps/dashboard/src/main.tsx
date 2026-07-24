@@ -382,7 +382,10 @@ const router = createBrowserRouter([
               },
               {
                 path: ROUTES.TRANSLATIONS,
-                element: (
+                // narella: translations backend is @novu/ee-translation, absent from CE builds — redirect instead of rendering an upsell page
+                element: IS_SELF_HOSTED_CE ? (
+                  <Navigate to={ROUTES.ROOT} replace />
+                ) : (
                   <ProtectedRoute permission={PermissionsEnum.WORKFLOW_READ}>
                     <TranslationsPage />
                   </ProtectedRoute>
@@ -411,7 +414,8 @@ const router = createBrowserRouter([
                 children: [
                   {
                     path: ROUTES.AGENTS,
-                    element: <AgentsPage />,
+                    // narella: conversational agents are unavailable in self-hosted CE — redirect instead of rendering the Contact Sales teaser
+                    element: IS_SELF_HOSTED_CE ? <Navigate to={ROUTES.ROOT} replace /> : <AgentsPage />,
                   },
                   {
                     path: ROUTES.AGENT_DETAILS_INTEGRATIONS_DETAIL,

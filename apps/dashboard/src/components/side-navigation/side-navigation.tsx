@@ -154,16 +154,19 @@ export const LegacySideNavigation = () => {
                   <span>Layouts</span>
                 </NavigationLink>
               </Protect>
-              <NavigationLink
-                to={
-                  currentEnvironment?.slug
-                    ? buildRoute(ROUTES.TRANSLATIONS, { environmentSlug: currentEnvironment?.slug ?? '' })
-                    : undefined
-                }
-              >
-                <RiTranslate2 className="size-4" />
-                <span>Translations</span>
-              </NavigationLink>
+              {/* narella: translations are served by @novu/ee-translation, absent from CE builds — hide instead of upselling */}
+              {!IS_SELF_HOSTED_CE && (
+                <NavigationLink
+                  to={
+                    currentEnvironment?.slug
+                      ? buildRoute(ROUTES.TRANSLATIONS, { environmentSlug: currentEnvironment?.slug ?? '' })
+                      : undefined
+                  }
+                >
+                  <RiTranslate2 className="size-4" />
+                  <span>Translations</span>
+                </NavigationLink>
+              )}
             </NavigationGroup>
             <NavigationGroup label="Data">
               <Protect permission={PermissionsEnum.SUBSCRIBER_READ}>

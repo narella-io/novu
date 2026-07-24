@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { FacetedFormFilter } from '@/components/primitives/form/faceted-filter/facated-form-filter';
 import { PermissionButton } from '@/components/primitives/permission-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/primitives/table';
-import { IS_SELF_HOSTED_CE } from '@/config';
 import { useEnvironment } from '@/context/environment/hooks';
 import { useFetchEnvironmentVariables } from '@/hooks/use-fetch-environment-variables';
 import { useFetchSubscription } from '@/hooks/use-fetch-subscription';
@@ -22,12 +21,11 @@ export const VariableList = () => {
   const navigate = useNavigate();
   const { subscription, isLoading: isLoadingSubscription } = useFetchSubscription();
 
-  const canUseVariablesFeature =
-    getFeatureForTierAsBoolean(
-      FeatureNameEnum.ENVIRONMENT_VARIABLES,
-      subscription?.apiServiceLevel || ApiServiceLevelEnum.FREE
-    ) &&
-    !IS_SELF_HOSTED_CE;
+  // narella: self-hosted CE is fully unlocked — the community API serves environment variables.
+  const canUseVariablesFeature = getFeatureForTierAsBoolean(
+    FeatureNameEnum.ENVIRONMENT_VARIABLES,
+    subscription?.apiServiceLevel || ApiServiceLevelEnum.FREE
+  );
 
   useEffect(() => {
     const timeout = setTimeout(() => {

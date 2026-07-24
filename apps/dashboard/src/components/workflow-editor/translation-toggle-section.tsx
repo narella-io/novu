@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipPortal, TooltipTrigger } from '@/components/primitives/tooltip';
 import { TranslationDrawer } from '@/components/translations/translation-drawer/translation-drawer';
 import { TranslationSwitch } from '@/components/translations/translation-switch';
+import { IS_SELF_HOSTED_CE } from '@/config';
 import { useEnvironment } from '@/context/environment/hooks';
 import { useFetchOrganizationSettings } from '@/hooks/use-fetch-organization-settings';
 import { LocalizationResourceEnum } from '@/types/translations';
@@ -41,6 +42,12 @@ export function TranslationToggleSection({
 
   const hasTargetLocales = (organizationSettings?.data?.targetLocales?.length ?? 0) > 0;
   const needsOnboarding = !isLoadingSettings && !hasTargetLocales;
+
+  // narella: translations are served by @novu/ee-translation, absent from CE builds —
+  // hide the whole section (switch + upgrade tooltip) instead of rendering a disabled upsell control.
+  if (IS_SELF_HOSTED_CE) {
+    return null;
+  }
 
   const handleManageTranslationsClick = (e: React.MouseEvent) => {
     e.preventDefault();
