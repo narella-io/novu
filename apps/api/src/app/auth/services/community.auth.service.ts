@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import {
   AnalyticsService,
@@ -39,6 +40,8 @@ import {
   UserSessionData,
 } from '@novu/shared';
 import { createHash } from 'crypto';
+import { CreateOrganizationCommand } from '../../organization/usecases/create-organization/create-organization.command';
+import { CreateOrganization } from '../../organization/usecases/create-organization/create-organization.usecase';
 import { CreateUserCommand } from '../../user/usecases/create-user/create-user.command';
 import { CreateUser } from '../../user/usecases/create-user/create-user.usecase';
 import { SwitchOrganizationCommand } from '../usecases/switch-organization/switch-organization.command';
@@ -56,7 +59,8 @@ export class CommunityAuthService implements IAuthService {
     private environmentRepository: EnvironmentRepository,
     private memberRepository: MemberRepository,
     @Inject(forwardRef(() => SwitchOrganization))
-    private switchOrganizationUsecase: SwitchOrganization
+    private switchOrganizationUsecase: SwitchOrganization,
+    private moduleRef: ModuleRef
   ) {}
 
   public async authenticate(
@@ -102,11 +106,6 @@ export class CommunityAuthService implements IAuthService {
         this.analyticsService.alias(distinctId, user._id);
       }
 
-      // narella: the community dashboard has no invite UI, so a new OAuth
-      // user auto-joins the single existing organization (allowlist already
-      // gated who can get here). No-op when zero or multiple orgs exist.
-      await this.autoJoinSingleOrganization(user);
-
       this.analyticsService.track('[Authentication] - Signup', user._id, {
         loginType: authProvider,
         origin,
@@ -124,16 +123,42 @@ export class CommunityAuthService implements IAuthService {
 
     this.analyticsService.upsertUser(user, user._id);
 
+    // narella: the community dashboard has no org onboarding for OAuth users
+    // (its create-organization page is Clerk-backed and CE bounces off it,
+    // looping). Ensure membership BEFORE minting the token so the JWT carries
+    // organization/environment claims: first allowlisted login creates the
+    // org; later ones join it.
+    await this.ensureOrganizationMembership(user);
+
     return {
       newUser,
       token: await this.generateUserToken(user),
     };
   }
 
-  private async autoJoinSingleOrganization(user: UserEntity): Promise<void> {
+  private async ensureOrganizationMembership(user: UserEntity): Promise<void> {
     try {
       const organizations = await this.organizationRepository.find({});
+
+      if (organizations.length === 0) {
+        // ModuleRef (lazy, strict:false) avoids a constructor-injection cycle
+        // between the auth and organization modules. CreateOrganization also
+        // provisions environments/API keys and adds the creator as owner.
+        const createOrganization = this.moduleRef.get(CreateOrganization, { strict: false });
+        await createOrganization.execute(
+          CreateOrganizationCommand.create({
+            userId: user._id,
+            name: process.env.DEFAULT_ORGANIZATION_NAME || 'Narella',
+          })
+        );
+
+        return;
+      }
+
       if (organizations.length !== 1) return;
+
+      const alreadyMember = await this.memberRepository.isMemberOfOrganization(organizations[0]._id, user._id);
+      if (alreadyMember) return;
 
       await this.memberRepository.addMember(organizations[0]._id, {
         _userId: user._id,
@@ -141,7 +166,7 @@ export class CommunityAuthService implements IAuthService {
         memberStatus: MemberStatusEnum.ACTIVE,
       });
     } catch (e) {
-      // Joining is best-effort; the user can still be added manually.
+      // Best-effort; the user can still be added manually.
     }
   }
 
