@@ -24,7 +24,6 @@ export function SignIn() {
   // /v1/auth/google/callback redirects back here with ?token= (success) or
   // ?error= (rejected/not allowlisted); ingest mirrors the upstream
   // password flow (localStorage JWT + Clerk.loggedIn shim).
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +34,11 @@ export function SignIn() {
     if (token) {
       localStorage.setItem(JWT_STORAGE_KEY, token);
       (window as any).Clerk = { ...((window as any).Clerk || {}), loggedIn: true };
-      navigate('/');
+      // Full reload, NOT an SPA navigate: the auth provider initialized as
+      // logged-out before this effect ran, so a soft navigate bounces back to
+      // sign-in and forces a second click. A reload boots the app with the
+      // token already in localStorage.
+      window.location.replace('/');
       return;
     }
 
@@ -46,7 +49,7 @@ export function SignIn() {
           : authError
       );
     }
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   const signInWithGoogle = () => {
     const state = encodeURIComponent(JSON.stringify({ source: 'web', isLoginPage: true }));
