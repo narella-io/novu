@@ -9,7 +9,12 @@ export const OrganizationListPage = () => {
 
   useEffect(() => {
     if (IS_SELF_HOSTED_CE) {
-      void navigate('/');
+      // narella: a CE session without an organization (stale token minted
+      // before the api's auto-create-org patch) used to ping-pong between
+      // '/' and this page forever. Self-heal: drop the token and
+      // re-authenticate — the api creates/joins the org during OAuth login.
+      localStorage.removeItem('self-hosted-jwt');
+      window.location.replace('/auth/sign-in');
     }
   }, [navigate]);
 
