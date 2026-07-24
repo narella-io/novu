@@ -6,6 +6,7 @@ export interface SelfHostedUser {
   externalId?: string;
   firstName?: string;
   lastName?: string;
+  imageUrl?: string;
   emailAddresses: Array<{ emailAddress?: string }>;
   primaryEmailAddress?: { emailAddress?: string };
   createdAt: Date;
@@ -26,6 +27,7 @@ export function createUserFromJwt(decodedJwt: DecodedJwt | null): SelfHostedUser
     externalId: decodedJwt._id,
     firstName: decodedJwt.firstName,
     lastName: decodedJwt.lastName,
+    imageUrl: decodedJwt.profilePicture,
     emailAddresses: [{ emailAddress: decodedJwt.email }],
     primaryEmailAddress: { emailAddress: decodedJwt.email },
     createdAt: new Date(),

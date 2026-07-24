@@ -1,0 +1,26 @@
+<svg width="308" height="180" viewBox="0 0 308 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="narellaMarkDarkGradient" x1="56" y1="24" x2="252" y2="156" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35B2FF"/>
+      <stop offset="0.52" stop-color="#5557FF"/>
+      <stop offset="1" stop-color="#E47CFF"/>
+    </linearGradient>
+    <filter id="narellaMarkGlow" x="0" y="0" width="308" height="180" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.18 0"/>
+    </filter>
+  </defs>
+  <g filter="url(#narellaMarkGlow)">
+    <path d="M56 34V146" stroke="#35B2FF" stroke-width="10" stroke-linecap="round"/>
+    <path d="M56 34L154 90L252 146" stroke="url(#narellaMarkDarkGradient)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M252 34V146" stroke="#E47CFF" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <path d="M56 34V146" stroke="#35B2FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M56 34L154 90L252 146" stroke="url(#narellaMarkDarkGradient)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M252 34V146" stroke="#E47CFF" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="56" cy="34" r="16" fill="#35B2FF"/>
+  <circle cx="56" cy="146" r="16" fill="#164CFF"/>
+  <circle cx="154" cy="90" r="16" fill="#6653FF"/>
+  <circle cx="252" cy="34" r="16" fill="#E47CFF"/>
+  <circle cx="252" cy="146" r="16" fill="#9D4BFF"/>
+</svg>

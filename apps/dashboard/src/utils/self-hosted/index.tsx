@@ -96,6 +96,7 @@ export function ClerkProvider({ children }: any) {
 };
 
 export type DecodedJwt = {
+  profilePicture?: string;
   _id: string;
   firstName: string;
   lastName: string;

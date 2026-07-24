@@ -27,6 +27,7 @@ export function OrganizationContextProvider({ children }: any) {
     organization: organization
       ? {
           name: organization.name,
+          logo: organization.branding?.logo,
           createdAt: new Date(organization.createdAt),
           updatedAt: new Date(organization.updatedAt),
           externalOrgId: organization._id,
