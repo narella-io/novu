@@ -1,0 +1,16 @@
+{
+  "name": "narella-novu-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server for the Narella self-hosted Novu: workflow authoring tools behind MCP-spec OAuth (PKCE + dynamic client registration, Google identity).",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "express": "^4.19.0",
+    "zod": "^3.23.0"
+  }
+}
