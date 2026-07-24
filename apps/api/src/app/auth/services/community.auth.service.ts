@@ -34,6 +34,7 @@ import {
   AuthProviderEnum,
   ISubscriberJwt,
   MemberRoleEnum,
+  MemberStatusEnum,
   normalizeEmail,
   UserSessionData,
 } from '@novu/shared';
@@ -101,6 +102,11 @@ export class CommunityAuthService implements IAuthService {
         this.analyticsService.alias(distinctId, user._id);
       }
 
+      // narella: the community dashboard has no invite UI, so a new OAuth
+      // user auto-joins the single existing organization (allowlist already
+      // gated who can get here). No-op when zero or multiple orgs exist.
+      await this.autoJoinSingleOrganization(user);
+
       this.analyticsService.track('[Authentication] - Signup', user._id, {
         loginType: authProvider,
         origin,
@@ -122,6 +128,22 @@ export class CommunityAuthService implements IAuthService {
       newUser,
       token: await this.generateUserToken(user),
     };
+  }
+
+  private async autoJoinSingleOrganization(user: UserEntity): Promise<void> {
+    try {
+      const organizations = await this.organizationRepository.find({});
+      if (organizations.length !== 1) return;
+
+      await this.memberRepository.addMember(organizations[0]._id, {
+        _userId: user._id,
+        roles: [MemberRoleEnum.OWNER],
+        invite: null,
+        memberStatus: MemberStatusEnum.ACTIVE,
+      });
+    } catch (e) {
+      // Joining is best-effort; the user can still be added manually.
+    }
   }
 
   private async updateUserUsername(

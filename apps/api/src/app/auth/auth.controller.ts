@@ -88,6 +88,37 @@ export class AuthController {
     return response.redirect(url);
   }
 
+  // narella: Google OAuth entry + callback. The callback deliberately does
+  // NOT use buildOauthRedirectUrl — that targets /auth/login, a route that
+  // does not exist in the v3 community dashboard; /auth/sign-in ingests the
+  // token (see apps/dashboard utils/self-hosted).
+  @Get('/google')
+  googleAuth() {
+    this.logger.trace('Checking Google Auth');
+
+    if (!process.env.GOOGLE_OAUTH_CLIENT_ID || !process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
+      throw new BadRequestException(
+        'Google auth is not configured, please provide GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET as env variables'
+      );
+    }
+
+    return {
+      success: true,
+    };
+  }
+
+  @Get('/google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(@Req() request, @Res() response) {
+    const base = `${process.env.DASHBOARD_URL || process.env.FRONT_BASE_URL}/auth/sign-in`;
+
+    if (!request.user || !request.user.token) {
+      return response.redirect(`${base}?error=AuthenticationError`);
+    }
+
+    return response.redirect(`${base}?token=${request.user.token}`);
+  }
+
   @Get('/refresh')
   @RequireAuthentication()
   @Header('Cache-Control', 'no-store')

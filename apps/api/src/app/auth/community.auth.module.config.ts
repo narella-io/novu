@@ -14,6 +14,7 @@ import { AuthService } from './services/auth.service';
 import { CommunityAuthService } from './services/community.auth.service';
 import { ApiKeyStrategy } from './services/passport/apikey.strategy';
 import { GitHubStrategy } from './services/passport/github.strategy';
+import { GoogleStrategy } from './services/passport/google.strategy';
 import { JwtStrategy } from './services/passport/jwt.strategy';
 import { JwtSubscriberStrategy } from './services/passport/subscriber-jwt.strategy';
 import { USE_CASES } from './usecases';
@@ -22,6 +23,10 @@ const AUTH_STRATEGIES: Provider[] = [JwtStrategy, ApiKeyStrategy, JwtSubscriberS
 
 if (process.env.GITHUB_OAUTH_CLIENT_ID) {
   AUTH_STRATEGIES.push(GitHubStrategy);
+}
+
+if (process.env.GOOGLE_OAUTH_CLIENT_ID) {
+  AUTH_STRATEGIES.push(GoogleStrategy);
 }
 
 export function getCommunityAuthModuleConfig(): ModuleMetadata {
@@ -86,6 +91,20 @@ export function configure(consumer: MiddlewareConsumer) {
       )
       .forRoutes({
         path: '/auth/github',
+        method: RequestMethod.GET,
+      });
+  }
+
+  if (process.env.GOOGLE_OAUTH_CLIENT_ID) {
+    consumer
+      .apply(
+        passport.authenticate(AuthProviderEnum.GOOGLE, {
+          session: false,
+          scope: ['profile', 'email'],
+        })
+      )
+      .forRoutes({
+        path: '/auth/google',
         method: RequestMethod.GET,
       });
   }
