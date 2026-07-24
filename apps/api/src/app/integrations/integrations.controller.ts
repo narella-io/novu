@@ -188,6 +188,15 @@ export class IntegrationsController {
     );
   }
 
+  // narella: region list for the AWS-provider region combobox (SES/SNS).
+  @Get('/aws/regions')
+  @RequireAuthentication()
+  async getAwsRegionList(): Promise<{ data: string[] }> {
+    const { getAwsRegions } = await import('./utils/aws-regions');
+
+    return { data: await getAwsRegions() };
+  }
+
   @Get('/active')
   @OAuthAccessible()
   @ApiOkResponse({
