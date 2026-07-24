@@ -7,6 +7,7 @@ import {
   PermissionsEnum,
   slackConfig,
   EmailProviderIdEnum,
+  SmsProviderIdEnum,
 } from '@novu/shared';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -102,8 +103,8 @@ export function IntegrationSettings({
           identifier: generateSlug(provider?.displayName ?? ''),
           active: true,
           primary: true,
-          // narella: SES defaults to workload identity (pod IAM role).
-          credentials: (provider?.id === EmailProviderIdEnum.SES
+          // narella: AWS providers default to workload identity (pod IAM role).
+          credentials: (provider?.id === EmailProviderIdEnum.SES || provider?.id === SmsProviderIdEnum.SNS
             ? { [CredentialsKeyEnum.UseWorkloadIdentity]: true }
             : {}) as unknown as Record<string, string>,
           configurations: {},
@@ -195,7 +196,7 @@ export function IntegrationSettings({
 
     // narella: with workload identity ON, the static key fields are
     // irrelevant — hide them entirely (the api rejects mixed modes anyway).
-    if (provider.id === EmailProviderIdEnum.SES && sesUseWorkloadIdentity) {
+    if ((provider.id === EmailProviderIdEnum.SES || provider.id === SmsProviderIdEnum.SNS) && sesUseWorkloadIdentity) {
       visibleCredentials = visibleCredentials.filter(
         (credential) =>
           credential.key !== CredentialsKeyEnum.ApiKey && credential.key !== CredentialsKeyEnum.SecretKey

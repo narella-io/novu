@@ -4,4 +4,5 @@ export type SNSConfig = SNSClientConfig & {
   accessKeyId?: string;
   secretAccessKey?: string;
   region?: string;
+  useWorkloadIdentity?: boolean;
 };

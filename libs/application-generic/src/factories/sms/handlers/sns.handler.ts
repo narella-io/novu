@@ -8,6 +8,7 @@ export class SnsHandler extends BaseSmsHandler {
   }
   buildProvider(credentials: ICredentials) {
     this.provider = new SNSSmsProvider({
+      useWorkloadIdentity: credentials.useWorkloadIdentity,
       accessKeyId: credentials.apiKey,
       secretAccessKey: credentials.secretKey,
       region: credentials.region,

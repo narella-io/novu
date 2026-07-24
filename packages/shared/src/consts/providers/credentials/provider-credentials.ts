@@ -441,17 +441,24 @@ export const clickatellConfig: IConfigCredential[] = [
 ];
 
 export const snsConfig: IConfigCredential[] = [
+  // narella: same two-mode auth as SES — workload identity or a key pair.
+  {
+    key: CredentialsKeyEnum.UseWorkloadIdentity,
+    displayName: 'Use workload identity (pod IAM role — no keys)',
+    type: 'switch',
+    required: false,
+  },
   {
     key: CredentialsKeyEnum.ApiKey,
-    displayName: 'Access key ID',
+    displayName: 'Access key ID (leave blank with workload identity)',
     type: 'string',
-    required: true,
+    required: false,
   },
   {
     key: CredentialsKeyEnum.SecretKey,
-    displayName: 'Secret access key',
+    displayName: 'Secret access key (leave blank with workload identity)',
     type: 'string',
-    required: true,
+    required: false,
   },
   {
     key: CredentialsKeyEnum.Region,

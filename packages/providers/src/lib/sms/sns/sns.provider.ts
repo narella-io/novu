@@ -13,12 +13,19 @@ export class SNSSmsProvider extends BaseProvider implements ISmsProvider {
 
   constructor(private readonly config: SNSConfig) {
     super();
+    // narella: workload identity / blank keys -> AWS SDK default chain (IRSA).
+    const useKeys =
+      !this.config.useWorkloadIdentity && this.config.accessKeyId && this.config.secretAccessKey;
     this.client = new SNSClient({
       region: this.config.region,
-      credentials: {
-        accessKeyId: this.config.accessKeyId,
-        secretAccessKey: this.config.secretAccessKey,
-      },
+      ...(useKeys
+        ? {
+            credentials: {
+              accessKeyId: this.config.accessKeyId,
+              secretAccessKey: this.config.secretAccessKey,
+            },
+          }
+        : {}),
     });
   }
 

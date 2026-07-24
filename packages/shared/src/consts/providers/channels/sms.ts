@@ -77,7 +77,7 @@ export const smsProviders: IProviderConfig[] = [
   },
   {
     id: SmsProviderIdEnum.SNS,
-    displayName: 'SNS',
+    displayName: 'AWS SNS',
     channel: ChannelTypeEnum.SMS,
     credentials: snsConfig,
     docReference: `https://docs.novu.co/integrations/providers/sms/aws-sns${UTM_CAMPAIGN_QUERY_PARAM}`,
