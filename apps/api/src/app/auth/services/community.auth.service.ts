@@ -138,7 +138,6 @@ export class CommunityAuthService implements IAuthService {
       await this.memberRepository.addMember(organizations[0]._id, {
         _userId: user._id,
         roles: [MemberRoleEnum.OWNER],
-        invite: null,
         memberStatus: MemberStatusEnum.ACTIVE,
       });
     } catch (e) {
