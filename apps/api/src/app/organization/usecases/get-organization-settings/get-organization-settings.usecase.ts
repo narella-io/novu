@@ -16,7 +16,8 @@ export class GetOrganizationSettings {
     }
 
     return {
-      removeNovuBranding: organization.removeNovuBranding || false,
+      // narella: self-hosted fork is de-branded by default (no paywall).
+      removeNovuBranding: organization.removeNovuBranding ?? true,
       defaultLocale: organization.defaultLocale || DEFAULT_LOCALE,
       targetLocales: organization.targetLocales || [],
     };

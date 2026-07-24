@@ -43,24 +43,7 @@ export class UpdateOrganizationSettings {
   }
 
   private validateTierRestrictions(command: UpdateOrganizationSettingsCommand, organization: OrganizationEntity): void {
-    // Only validate branding feature access if user is trying to update it
-    if (command.removeNovuBranding !== undefined) {
-      const canRemoveNovuBranding = getFeatureForTierAsBoolean(
-        FeatureNameEnum.PLATFORM_REMOVE_NOVU_BRANDING_BOOLEAN,
-        organization.apiServiceLevel || ApiServiceLevelEnum.FREE
-      );
-
-      if (!canRemoveNovuBranding) {
-        throw new HttpException(
-          {
-            error: 'Payment Required',
-            message:
-              'Removing Novu branding is not allowed on the free plan. Please upgrade to a paid plan to access this feature.',
-          },
-          HttpStatus.PAYMENT_REQUIRED
-        );
-      }
-    }
+    // narella: branding toggle is unrestricted in the self-hosted fork.
 
     if (command.targetLocales !== undefined || command.defaultLocale !== undefined) {
       const canUseTranslations = getFeatureForTierAsBoolean(
@@ -101,7 +84,7 @@ export class UpdateOrganizationSettings {
 
   private buildSettingsResponse(organization: OrganizationEntity): GetOrganizationSettingsDto {
     return {
-      removeNovuBranding: organization.removeNovuBranding || false,
+      removeNovuBranding: organization.removeNovuBranding ?? true,
       defaultLocale: organization.defaultLocale || DEFAULT_LOCALE,
       targetLocales: organization.targetLocales || [],
     };
