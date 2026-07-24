@@ -2,16 +2,6 @@ import { CredentialsKeyEnum, IConfigCredential } from '@novu/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { get } from '../../../api/api.client';
-import { Button } from '@/components/primitives/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/primitives/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/primitives/popover';
 import { ReactNode } from 'react';
 import { Control, ControllerFieldState, ControllerRenderProps } from 'react-hook-form';
 import { CopyButton } from '@/components/primitives/copy-button';
@@ -385,45 +375,48 @@ function AwsRegionCombobox({
     retry: 1,
   });
   const regions = data?.data?.length ? data.data : AWS_REGION_FALLBACK;
+  const query = ((field.value as string) || '').toLowerCase();
+  const filtered = query ? regions.filter((region) => region.includes(query)) : regions;
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="relative flex flex-col gap-1">
       <FormLabel credential={credential} tooltip={tooltip} />
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="secondary"
-            mode="outline"
-            disabled={isReadOnly}
-            className="w-full justify-start font-normal"
-          >
-            {(field.value as string) || 'Select a region…'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[320px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search regions…" />
-            <CommandList>
-              <CommandEmpty>No region found.</CommandEmpty>
-              <CommandGroup>
-                {regions.map((region) => (
-                  <CommandItem
-                    key={region}
-                    value={region}
-                    onSelect={(value) => {
-                      field.onChange(value);
-                      setOpen(false);
-                    }}
-                  >
-                    {region}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <Input
+        id={credential.key}
+        type="text"
+        placeholder="Type to search regions…"
+        value={(field.value as string) || ''}
+        disabled={isReadOnly}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          field.onChange(e.target.value);
+          setOpen(true);
+        }}
+        onBlur={() => {
+          field.onBlur();
+          // Delay so an option mousedown can commit before the list unmounts.
+          setTimeout(() => setOpen(false), 150);
+        }}
+      />
+      {open && filtered.length > 0 && (
+        <div className="border-stroke-soft bg-background absolute top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border shadow-md">
+          {filtered.map((region) => (
+            <button
+              key={region}
+              type="button"
+              className="hover:bg-neutral-alpha-100 block w-full cursor-pointer px-3 py-1.5 text-left text-sm"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                field.onChange(region);
+                setOpen(false);
+              }}
+            >
+              {region}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
