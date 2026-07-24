@@ -30,6 +30,7 @@ import {
   WelcomePage,
   WorkflowsPage,
 } from '@/pages';
+import { McpServerPage } from '@/pages/mcp-server';
 import { DuplicateWorkflowPage } from '@/pages/duplicate-workflow';
 import { EditStepTemplateV2Page } from '@/pages/edit-step-template-v2';
 import { Landing1SignUpPage } from '@/pages/landing-1-signup';
@@ -445,6 +446,10 @@ const router = createBrowserRouter([
               {
                 path: ROUTES.DOMAIN_DETAIL,
                 element: !IS_SELF_HOSTED_CE ? <DomainDetailPage /> : <Navigate to={ROUTES.ROOT} replace />,
+              },
+              {
+                path: ROUTES.MCP_SERVER,
+                element: <McpServerPage />,
               },
               {
                 path: ROUTES.API_KEYS,

@@ -8,6 +8,7 @@ import {
   RiDiscussLine,
   RiGroup2Line,
   RiKey2Line,
+  RiSparklingLine,
   RiLayout5Line,
   RiLineChartLine,
   RiRobot2Line,
@@ -264,6 +265,10 @@ export const LegacySideNavigation = () => {
                     <span>API Keys</span>
                   </NavigationLink>
                 </Protect>
+                <NavigationLink to={ROUTES.MCP_SERVER}>
+                  <RiSparklingLine className="size-4" />
+                  <span>MCP Server</span>
+                </NavigationLink>
                 {isWebhooksManagementEnabled && (
                   <Protect
                     condition={(has) =>
