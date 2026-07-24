@@ -25,6 +25,9 @@ aws ecr get-login-password --region "$REGION" | docker login --username AWS --pa
 EMPTY_SECRET="$(mktemp)"
 trap 'rm -f "$EMPTY_SECRET"' EXIT
 
+# Upstream CI does this copy before building (see .github/workflows/deploy.yml):
+cp scripts/dotenvcreate.mjs apps/api/src/dotenvcreate.mjs
+
 echo "=== building ${PREFIX}-api:${TAG} (fork: de-brand + Google OAuth + telemetry) ==="
 pnpm --silent --workspace-root pnpm-context -- apps/api/Dockerfile | docker buildx build \
   --platform linux/amd64 \
