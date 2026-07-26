@@ -30,6 +30,12 @@ import { CreateOrganizationCommand } from './usecases/create-organization/create
 import { CreateOrganization } from './usecases/create-organization/create-organization.usecase';
 import { GetMyOrganizationCommand } from './usecases/get-my-organization/get-my-organization.command';
 import { GetMyOrganization } from './usecases/get-my-organization/get-my-organization.usecase';
+import { GetOrganizationSettingsDto } from './dtos/get-organization-settings.dto';
+import { UpdateOrganizationSettingsDto } from './dtos/update-organization-settings.dto';
+import { GetOrganizationSettingsCommand } from './usecases/get-organization-settings/get-organization-settings.command';
+import { GetOrganizationSettings } from './usecases/get-organization-settings/get-organization-settings.usecase';
+import { UpdateOrganizationSettingsCommand } from './usecases/update-organization-settings/update-organization-settings.command';
+import { UpdateOrganizationSettings } from './usecases/update-organization-settings/update-organization-settings.usecase';
 import { GetOrganizationsCommand } from './usecases/get-organizations/get-organizations.command';
 import { GetOrganizations } from './usecases/get-organizations/get-organizations.usecase';
 import { ChangeMemberRoleCommand } from './usecases/membership/change-member-role/change-member-role.command';
@@ -58,7 +64,9 @@ export class OrganizationController {
     private updateBrandingDetailsUsecase: UpdateBrandingDetails,
     private getOrganizationsUsecase: GetOrganizations,
     private getMyOrganizationUsecase: GetMyOrganization,
-    private renameOrganizationUsecase: RenameOrganization
+    private renameOrganizationUsecase: RenameOrganization,
+    private getOrganizationSettingsUsecase: GetOrganizationSettings,
+    private updateOrganizationSettingsUsecase: UpdateOrganizationSettings
   ) {}
 
   @Post('/')
@@ -202,6 +210,42 @@ export class OrganizationController {
         name: body.name,
         userId: user._id,
         id: user.organizationId,
+      })
+    );
+  }
+
+  // narella: the org settings routes (remove-branding toggle + locales) live only on
+  // the EE controller upstream, so on the self-hosted community edition the dashboard's
+  // GET/PATCH /v1/organizations/settings 404s. Mirror them here against the same de-gated
+  // usecases so the "Remove branding?" toggle works.
+  @Get('/settings')
+  @ExternalApiAccessible()
+  @ApiResponse(GetOrganizationSettingsDto)
+  @ApiOperation({
+    summary: 'Get organization settings',
+  })
+  async getSettings(@UserSession() user: UserSessionData) {
+    return await this.getOrganizationSettingsUsecase.execute(
+      GetOrganizationSettingsCommand.create({
+        organizationId: user.organizationId,
+      })
+    );
+  }
+
+  @Patch('/settings')
+  @ExternalApiAccessible()
+  @ApiResponse(UpdateOrganizationSettingsDto)
+  @ApiOperation({
+    summary: 'Update organization settings',
+  })
+  async updateSettings(@UserSession() user: UserSessionData, @Body() body: UpdateOrganizationSettingsDto) {
+    return await this.updateOrganizationSettingsUsecase.execute(
+      UpdateOrganizationSettingsCommand.create({
+        userId: user._id,
+        organizationId: user.organizationId,
+        removeNovuBranding: body.removeNovuBranding,
+        defaultLocale: body.defaultLocale,
+        targetLocales: body.targetLocales,
       })
     );
   }
