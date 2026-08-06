@@ -1,6 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { SendWebhookMessage, SvixProviderService } from '@novu/application-generic';
 import { NoopSendWebhookMessage } from '../inbox/usecases/noop-send-webhook-message.usecase';
+import { CommunitySendWebhookMessage } from './usecases/community-send-webhook/community-send-webhook.usecase';
 import { SharedModule } from '../shared/shared.module';
 import { OutboundWebhooksController } from './outbound-webhooks.controller';
 import { CreateWebhookPortalUsecase } from './usecases/create-webhook-portal-token/create-webhook-portal.usecase';
@@ -38,8 +39,11 @@ export const OutboundWebhooksModule = {
       imports: [SharedModule],
       providers: [
         {
+          // narella: community builds deliver outbound webhooks with a direct signed
+          // POST instead of dropping them. Falls back to the upstream no-op when
+          // NOVU_WEBHOOK_URL is unset, so an unconfigured deployment is unchanged.
           provide: SendWebhookMessage,
-          useClass: NoopSendWebhookMessage,
+          useClass: process.env.NOVU_WEBHOOK_URL ? CommunitySendWebhookMessage : NoopSendWebhookMessage,
         },
       ],
       exports: [SendWebhookMessage],
