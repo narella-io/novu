@@ -1,24 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SendWebhookMessageCommand } from '@novu/application-generic';
 import { createHmac } from 'node:crypto';
-import { PinoLogger } from 'nestjs-pino';
 
 /**
  * narella: outbound webhooks for COMMUNITY builds.
  *
- * WORKER COPY of the api usecase, kept byte-identical apart from this note. The two
- * apps build into separate images from separate Dockerfiles and share nothing outside
- * `libs/`; putting it in `libs/` to deduplicate would mean patching an upstream package
- * that every future rebase has to carry. Two small copies rebase more cleanly than one
- * shared edit in a file upstream also touches.
+ * WORKER COPY of the api usecase, kept byte-identical apart from this note. The two apps
+ * build into separate images from separate Dockerfiles and share nothing outside `libs/`;
+ * putting it in `libs/` to deduplicate would mean patching an upstream package that every
+ * future rebase has to carry. Two small copies rebase more cleanly than one shared edit in
+ * a file upstream also touches.
  *
  * WHY THIS EXISTS. Upstream gates outbound webhooks behind NOVU_ENTERPRISE and delivers
  * them through Svix; the worker binds `SendWebhookMessage` to its own
  * `NoopSendWebhookMessage`, so events are raised and then thrown away. The worker owns
- * DELIVERY events — message.sent / message.failed / message.delivered. The api patch
- * covers `preference.updated` (unsubscribes); this one is what makes a FAILED brief
- * notification visible at all. Without it Narella cannot tell a delivered email from a
- * bounced one.
+ * DELIVERY events — message.sent / message.failed / message.delivered. The api patch covers
+ * `preference.updated` (unsubscribes); this one is what makes a FAILED brief notification
+ * visible at all. Without it Narella cannot tell a delivered email from a bounced one.
  *
  * The enterprise packages are not in this fork and Svix is a third-party dependency we do
  * not want for one callback, so this is a direct signed POST instead. Same shape as the
@@ -39,9 +37,9 @@ import { PinoLogger } from 'nestjs-pino';
  */
 @Injectable()
 export class CommunitySendWebhookMessage {
-  constructor(private logger: PinoLogger) {
-    this.logger.setContext(this.constructor.name);
-  }
+  // Nest's own Logger, not nestjs-pino: pino is not a dependency of either app, and
+  // importing it built cleanly in isolation while failing the real image build.
+  private readonly logger = new Logger(CommunitySendWebhookMessage.name);
 
   async execute(command: SendWebhookMessageCommand): Promise<{ eventId: string } | undefined> {
     const url = process.env.NOVU_WEBHOOK_URL;
@@ -79,14 +77,13 @@ export class CommunitySendWebhookMessage {
 
       if (!response.ok) {
         this.logger.warn(
-          { status: response.status, eventType: command.eventType },
-          'narella: outbound webhook rejected by receiver'
+          `narella: outbound webhook rejected by receiver — status=${response.status} ` +
+            `eventType=${command.eventType}`
         );
       }
     } catch (error) {
       this.logger.warn(
-        { error, eventType: command.eventType },
-        'narella: outbound webhook delivery failed'
+        `narella: outbound webhook delivery failed — eventType=${command.eventType}: ${error}`
       );
     }
 

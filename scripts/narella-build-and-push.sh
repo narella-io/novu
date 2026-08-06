@@ -11,6 +11,21 @@
 # ECR CREATE_ON_PUSH templates auto-create the repositories on first push.
 set -euo pipefail
 
+# Preflight. The api/worker builds stream their context through a PIPE, so a missing
+# pnpm does not surface as "pnpm: command not found" — it hands buildx an EMPTY context,
+# and buildx reports `failed to read dockerfile: no local sources enabled`, which reads
+# like a buildx driver fault and sends you diagnosing builders instead. pnpm lives under
+# nvm and is absent from non-interactive shells, so this is the ordinary way to hit it.
+for cmd in pnpm docker aws; do
+  command -v "$cmd" >/dev/null || {
+    echo "ERROR: '$cmd' is not on PATH." >&2
+    [[ "$cmd" == "pnpm" ]] && \
+      echo "  nvm is not loaded in non-interactive shells. Try:" >&2 && \
+      echo "  export PATH=\"\$HOME/.nvm/versions/node/v22.21.1/bin:\$PATH\"" >&2
+    exit 1
+  }
+done
+
 TAG="${1:-v3.18.0-narella.1}"
 UPSTREAM_TAG="3.18.0"
 REGION="us-east-2"

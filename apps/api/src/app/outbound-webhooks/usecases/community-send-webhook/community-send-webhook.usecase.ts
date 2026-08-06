@@ -1,7 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SendWebhookMessageCommand } from '@novu/application-generic';
 import { createHmac } from 'node:crypto';
-import { PinoLogger } from 'nestjs-pino';
 
 /**
  * narella: outbound webhooks for COMMUNITY builds.
@@ -31,9 +30,9 @@ import { PinoLogger } from 'nestjs-pino';
  */
 @Injectable()
 export class CommunitySendWebhookMessage {
-  constructor(private logger: PinoLogger) {
-    this.logger.setContext(this.constructor.name);
-  }
+  // Nest's own Logger, not nestjs-pino: pino is not a dependency of either app, and
+  // importing it built cleanly in isolation while failing the real image build.
+  private readonly logger = new Logger(CommunitySendWebhookMessage.name);
 
   async execute(command: SendWebhookMessageCommand): Promise<{ eventId: string } | undefined> {
     const url = process.env.NOVU_WEBHOOK_URL;
@@ -71,14 +70,13 @@ export class CommunitySendWebhookMessage {
 
       if (!response.ok) {
         this.logger.warn(
-          { status: response.status, eventType: command.eventType },
-          'narella: outbound webhook rejected by receiver'
+          `narella: outbound webhook rejected by receiver — status=${response.status} ` +
+            `eventType=${command.eventType}`
         );
       }
     } catch (error) {
       this.logger.warn(
-        { error, eventType: command.eventType },
-        'narella: outbound webhook delivery failed'
+        `narella: outbound webhook delivery failed — eventType=${command.eventType}: ${error}`
       );
     }
 
