@@ -44,14 +44,33 @@ trap 'rm -f "$EMPTY_SECRET"' EXIT
 cp scripts/dotenvcreate.mjs apps/api/src/dotenvcreate.mjs
 cp scripts/dotenvcreate.mjs apps/worker/src/dotenvcreate.mjs
 
+# Stream a build context into buildx, judging success by DOCKER's exit code.
+#
+# `pipefail` is wrong for these two pipelines. buildx stops reading once it has the
+# context, pnpm-context then writes into a closed pipe and dies of SIGPIPE, and pipefail
+# promotes that into a failed pipeline — which `set -e` turns into an abort AFTER the
+# image has already built and pushed. Observed exactly that on v3.18.0-narella.13: the
+# api image reached ECR and the script still exited 13, taking the dashboard, worker and
+# ws builds with it. It is timing-dependent, so it looks like flakiness rather than a bug.
+#
+# Docker's status is the one that answers "did the image build", and a genuinely short
+# context makes docker fail, so nothing is masked by ignoring the producer's death.
+stream_build() {
+  local dockerfile="$1"; shift
+  set +o pipefail
+  pnpm --silent --workspace-root pnpm-context -- "$dockerfile" | docker buildx build "$@" -
+  local docker_rc=${PIPESTATUS[1]}
+  set -o pipefail
+  return "$docker_rc"
+}
+
 echo "=== building ${PREFIX}-api:${TAG} (fork: de-brand + Google OAuth + telemetry) ==="
-pnpm --silent --workspace-root pnpm-context -- apps/api/Dockerfile | docker buildx build \
+stream_build apps/api/Dockerfile \
   --platform linux/amd64 \
   --secret "id=BULL_MQ_PRO_NPM_TOKEN,src=${EMPTY_SECRET}" \
   --build-arg PACKAGE_PATH=apps/api \
   -t "${PREFIX}-api:${TAG}" \
-  --push \
-  -
+  --push
 
 echo "=== building ${PREFIX}-dashboard:${TAG} (fork: Google-only sign-in) ==="
 docker buildx build \
@@ -63,14 +82,13 @@ docker buildx build \
   --push \
   "$ROOT"
 
-echo "=== building ${PREFIX}-worker:${TAG} (fork: SES IRSA provider) ==="
-pnpm --silent --workspace-root pnpm-context -- apps/worker/Dockerfile | docker buildx build \
+echo "=== building ${PREFIX}-worker:${TAG} (fork: SES IRSA provider + outbound webhooks) ==="
+stream_build apps/worker/Dockerfile \
   --platform linux/amd64 \
   --secret "id=BULL_MQ_PRO_NPM_TOKEN,src=${EMPTY_SECRET}" \
   --build-arg PACKAGE_PATH=apps/worker \
   -t "${PREFIX}-worker:${TAG}" \
-  --push \
-  -
+  --push
 
 echo "=== mirroring upstream ws ${UPSTREAM_TAG} (no narella patches touch it) ==="
 for svc in ws; do
