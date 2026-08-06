@@ -81,6 +81,7 @@ import { LogInboundEmailRequest } from './usecases/inbound-email-parse/log-inbou
 import { DomainRouteStrategy } from './usecases/inbound-email-parse/strategies/domain-route.strategy';
 import { ReplyToStrategy } from './usecases/inbound-email-parse/strategies/reply-to.strategy';
 import { NoopSendWebhookMessage } from './usecases/noop-send-webhook-message.usecase';
+import { CommunitySendWebhookMessage } from './usecases/community-send-webhook/community-send-webhook.usecase';
 import { ResolveChannelEndpoints } from './usecases/send-message/channel-endpoint-resolution/resolve-channel-endpoints.usecase';
 import { ExecuteCodeFirstCustomStep } from './usecases/send-message/execute-code-first-custom-step.usecase';
 import { ExecuteHttpRequestStep } from './usecases/send-message/execute-http-request-step.usecase';
@@ -135,6 +136,12 @@ const webhookProvider: Provider = {
     if (isEnterprise) {
       Logger.log('Using enterprise SendWebhookMessage provider', 'EnterpriseProvider');
       return SendWebhookMessage;
+    } else if (process.env.NOVU_WEBHOOK_URL) {
+      // narella: community builds deliver delivery-events with a direct signed POST
+      // instead of dropping them. Falls through to the upstream no-op when
+      // NOVU_WEBHOOK_URL is unset, so an unconfigured deployment is unchanged.
+      Logger.log('Using narella community SendWebhookMessage provider', 'EnterpriseProvider');
+      return CommunitySendWebhookMessage;
     } else {
       Logger.log('Using noop SendWebhookMessage provider', 'EnterpriseProvider');
       return NoopSendWebhookMessage;
