@@ -1,0 +1,14 @@
+# narella: only the dashboard build uses the repo root as its Docker context (api/worker/ws
+# stream a gitignore-aware context through scripts/pnpm-context.mjs). Without this file a
+# checkout that has ever run a local build ships its dist/ folders into the dashboard builder,
+# where Nx (which has no .gitignore in there) reads the compiled libs/testing/dist
+# require('@novu/ee-auth') and aborts on the ee-auth -> application-generic -> testing ->
+# ee-auth task-graph cycle that the nx-ignore-next-line comments hide in src. Seen building
+# v3.18.0-narella.14.
+**/node_modules
+**/dist
+**/build
+**/*.tsbuildinfo
+.nx
+.git
+apps/api/src/metadata.ts
