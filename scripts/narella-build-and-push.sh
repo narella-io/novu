@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# Build the two patched Novu images (api, dashboard) for the Narella EKS
-# cluster and mirror the two unpatched upstream images (worker, ws) into ECR.
+# Build every Novu image the Narella EKS cluster runs (api, dashboard, worker,
+# ws, mcp) from this fork and push them to ECR.
 #
 #   ./scripts/narella-build-and-push.sh [tag]     # default: v3.18.0-narella.1
+#   ONLY="ws mcp" ./scripts/narella-build-and-push.sh v3.18.0-narella.N   # a subset
 #
+# ws used to be a mirror of upstream ghcr.io/novuhq/novu/ws, which made it the one
+# image a dependency fix in this fork could never reach (2026-10 CVE round: it carried
+# the same next/tar/axios rows as api). It now builds from the fork like api/worker.
+#
+# --no-cache-filter prod: the prod stage's `apk upgrade` line never changes, so a
+# cached layer would silently ship last month's openssl/curl. Only the final stage is
+# rebuilt; the expensive dev/deploy stages still use the cache.
 # Requirements: `pnpm install --ignore-scripts` at the repo root first (the
 # api build streams its context through scripts/pnpm-context.mjs, upstream's
 # own mechanism — see apps/api package.json docker:build). EKS nodes are
@@ -27,12 +35,13 @@ for cmd in pnpm docker aws; do
 done
 
 TAG="${1:-v3.18.0-narella.1}"
-UPSTREAM_TAG="3.18.0"
 REGION="us-east-2"
 REGISTRY="804837308083.dkr.ecr.${REGION}.amazonaws.com"
 PREFIX="${REGISTRY}/narella/novu"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+want() { [[ -z "${ONLY:-}" || " ${ONLY} " == *" $1 "* ]]; }
 
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRY"
 
@@ -43,6 +52,7 @@ trap 'rm -f "$EMPTY_SECRET"' EXIT
 # Upstream CI does this copy before building (see .github/workflows/deploy.yml):
 cp scripts/dotenvcreate.mjs apps/api/src/dotenvcreate.mjs
 cp scripts/dotenvcreate.mjs apps/worker/src/dotenvcreate.mjs
+cp scripts/dotenvcreate.mjs apps/ws/src/dotenvcreate.mjs
 
 # Stream a build context into buildx, judging success by DOCKER's exit code.
 #
@@ -64,37 +74,60 @@ stream_build() {
   return "$docker_rc"
 }
 
+if want api; then
 echo "=== building ${PREFIX}-api:${TAG} (fork: de-brand + Google OAuth + telemetry) ==="
 stream_build apps/api/Dockerfile \
   --platform linux/amd64 \
+  --no-cache-filter prod \
   --secret "id=BULL_MQ_PRO_NPM_TOKEN,src=${EMPTY_SECRET}" \
   --build-arg PACKAGE_PATH=apps/api \
   -t "${PREFIX}-api:${TAG}" \
   --push
+fi
 
+if want dashboard; then
 echo "=== building ${PREFIX}-dashboard:${TAG} (fork: Google-only sign-in) ==="
 docker buildx build \
   --platform linux/amd64 \
+  --no-cache-filter prod \
   --build-arg VITE_SELF_HOSTED=true \
   --build-arg VITE_NOVU_ENTERPRISE=false \
   -f "${ROOT}/apps/dashboard/dockerfile" \
   -t "${PREFIX}-dashboard:${TAG}" \
   --push \
   "$ROOT"
+fi
 
+if want worker; then
 echo "=== building ${PREFIX}-worker:${TAG} (fork: SES IRSA provider + outbound webhooks) ==="
 stream_build apps/worker/Dockerfile \
   --platform linux/amd64 \
+  --no-cache-filter prod \
   --secret "id=BULL_MQ_PRO_NPM_TOKEN,src=${EMPTY_SECRET}" \
   --build-arg PACKAGE_PATH=apps/worker \
   -t "${PREFIX}-worker:${TAG}" \
   --push
+fi
 
-echo "=== mirroring upstream ws ${UPSTREAM_TAG} (no narella patches touch it) ==="
-for svc in ws; do
-  docker pull --platform linux/amd64 "ghcr.io/novuhq/novu/${svc}:${UPSTREAM_TAG}"
-  docker tag "ghcr.io/novuhq/novu/${svc}:${UPSTREAM_TAG}" "${PREFIX}-${svc}:${TAG}"
-  docker push "${PREFIX}-${svc}:${TAG}"
-done
+if want ws; then
+echo "=== building ${PREFIX}-ws:${TAG} (fork: carries the fork's dependency fixes) ==="
+stream_build apps/ws/Dockerfile \
+  --platform linux/amd64 \
+  --no-cache-filter prod \
+  --secret "id=BULL_MQ_PRO_NPM_TOKEN,src=${EMPTY_SECRET}" \
+  --build-arg PACKAGE_PATH=apps/ws \
+  -t "${PREFIX}-ws:${TAG}" \
+  --push
+fi
 
-echo "DONE: ${PREFIX}-{api,dashboard,worker,ws}:${TAG}"
+if want mcp; then
+echo "=== building ${PREFIX}-mcp:${TAG} (narella-mcp/) ==="
+docker buildx build \
+  --platform linux/amd64 \
+  --pull --no-cache \
+  -t "${PREFIX}-mcp:${TAG}" \
+  --push \
+  "${ROOT}/narella-mcp"
+fi
+
+echo "DONE: ${PREFIX}-{api,dashboard,worker,ws,mcp}:${TAG} (ONLY=${ONLY:-all})"
