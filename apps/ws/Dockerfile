@@ -63,7 +63,14 @@ ENV CI=true
 
 RUN apk upgrade --no-cache && \
     apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main --upgrade libcrypto3 libssl3 musl musl-utils && \
-    npm --no-update-notifier --no-fund --global install pm2@6.0.14 && \
+    # narella: pm2 pins js-yaml 4.1.1 and pulls basic-ftp 5 (via proxy-agent); a global install
+    # cannot take overrides, so install it as a tiny project that can, then link its bins.
+    mkdir -p /opt/pm2 && cd /opt/pm2 && \
+    echo '{"private":true,"dependencies":{"pm2":"6.0.14"},"overrides":{"js-yaml":"4.3.2","basic-ftp":"6.2.1"}}' > package.json && \
+    npm --no-update-notifier --no-fund --no-audit install --omit=dev && \
+    npm cache clean --force && \
+    for b in pm2 pm2-runtime pm2-dev pm2-docker; do ln -s /opt/pm2/node_modules/pm2/bin/$b /usr/local/bin/$b; done && \
+    cd / && \
     rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Set non-root user
