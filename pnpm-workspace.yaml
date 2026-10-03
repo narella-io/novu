@@ -42,7 +42,7 @@ overrides:
   minimatch@>=9.0.0 <9.0.7: ^9.0.7
   nanoid@>=3.0.0 <3.3.18: ^3.3.18
   nth-check: ^2.1.1
-  postcss@<8.5.23: ^8.5.23
+  postcss@<8.5.28: 8.5.28
   proxy-agent@<6.3.1: ^6.3.1
   semver@>=7.0.0 <7.5.2: ^7.5.2
   systeminformation@<5.31.7: ^5.31.7
@@ -167,7 +167,7 @@ overrides:
   '@tootallnate/once@<3.0.1': ^3.0.1
   protobufjs@<7.6.5: ^7.6.5
   protobufjs@>=8.0.0 <8.6.6: ^8.6.6
-  ip-address@<10.7.1: ^10.7.1
+  ip-address@<10.7.3: 10.7.3
   mongoose@>=8.0.0 <8.24.1: ^8.24.1
   newrelic: 13.19.2
   fast-uri@<3.1.8: ^3.1.8
@@ -185,7 +185,7 @@ overrides:
   '@opentelemetry/context-async-hooks@<2.8.0': ^2.8.0
   mermaid@>=11.0.0-alpha.1 <11.15.0: ^11.15.0
   tsup@<8.3.5: ^8.3.5
-  sanitize-html@<2.17.7: ^2.17.7
+  sanitize-html: 2.18.0
   samlify@<2.13.0: ^2.13.0
   better-auth: 1.6.22
   # narella: keep the SSO plugin on the same release as better-auth (exact peer pins on better-call)
@@ -197,7 +197,8 @@ overrides:
   vitest@<4.1.11: ^4.1.11
   '@vitest/mocker@<4.1.11': ^4.1.11
   js-cookie@<3.0.7: ^3.0.7
-  liquidjs@<10.27.2: ^10.27.2
+  # narella: exact, so the tree holds ONE copy — two liquidjs copies break the api's Template[] types
+  liquidjs: 10.30.0
   linkify-it@<5.0.1: ^5.0.1
   # narella (2026-10 CVE round): transitive floors with no existing entry above
   websocket-driver@<0.7.5: ^0.7.5
