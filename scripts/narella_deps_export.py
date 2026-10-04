@@ -641,7 +641,8 @@ def _rel(context_name: str, fname: str) -> str:
 
 
 def export(context: str, context_name: str, importers: list[str] | None = None) -> list[dict]:
-    """Every ecosystem found in `context`, sorted. [] when nothing is supported."""
+    """Every non-empty ecosystem found in `context`, sorted. [] when nothing is supported
+    or every supported lockfile installs nothing."""
     ecos: list[dict] = []
 
     def have(f: str) -> bool:
@@ -693,6 +694,10 @@ def export(context: str, context_name: str, importers: list[str] | None = None) 
                 "packages": parse_go_mod(_read(os.path.join(context, "go.mod"))),
             }
         )
+    # A lockfile whose importers install nothing (e.g. a repo-root package-lock.json that
+    # only pins tooling for workspaces outside this context) contributes no ecosystem: an
+    # empty `packages` list would read as "this image has no dependencies".
+    ecos = [e for e in ecos if e["packages"]]
     ecos.sort(key=lambda e: (e["ecosystem"], e["lockfile"] or ""))
     return ecos
 
@@ -736,7 +741,7 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_PARSE
     if not ecos:
         print(
-            f"narella-deps-export: no supported lockfile in {args.context!r} "
+            f"narella-deps-export: no supported lockfile with packages in {args.context!r} "
             "(uv.lock, package-lock.json, pnpm-lock.yaml, go.mod); writing nothing — "
             "provenance for this context is UNKNOWN",
             file=sys.stderr,
