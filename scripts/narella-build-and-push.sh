@@ -74,6 +74,61 @@ stream_build() {
   return "$docker_rc"
 }
 
+# narella-deps/v1: attach a deps.json to each pushed image DIGEST as an OCI 1.1 referrer
+# (artifactType application/vnd.narella.deps.v1+json), the same artifact Narella's CI
+# attaches to its own images. The security inventory reads it to say whether a vulnerable
+# package is a direct dependency of the app and through which chain it arrives. Format
+# and fetch instructions: docs/narella-deps.md in narella-io/narella.
+#
+# The exporter is VENDORED at scripts/narella_deps_export.py (stdlib-only Python >= 3.11,
+# no network), copied verbatim from narella-io/narella scripts/deps-export/; refresh it
+# by copying, never by editing here. For the pnpm workspace it is scoped with --importer
+# to the app the image runs, so "direct" means direct for THAT app (plus the workspace
+# libs it links to), not for the whole monorepo.
+#
+# BEST-EFFORT, LOUD: a failure prints DEPS-ATTACH FAILED and the script carries on. The
+# images are already pushed by then, and an image without the artifact only means its
+# provenance is unknown, which the inventory never reads as "direct".
+DEPS_EXPORTER="${ROOT}/scripts/narella_deps_export.py"
+DEPS_TYPE="application/vnd.narella.deps.v1+json"
+attach_deps() {
+  local ref="$1" ctx="$2"; shift 2   # remaining args go to the exporter (e.g. --importer)
+  local out commit digest rc
+  if ! command -v oras >/dev/null; then
+    echo "DEPS-ATTACH FAILED: oras not on PATH (brew install oras); ${ref} has no deps.json" >&2
+    return 0
+  fi
+  if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
+    echo "DEPS-ATTACH FAILED: python3 >= 3.11 needed for the exporter; ${ref} has no deps.json" >&2
+    return 0
+  fi
+  out="$(mktemp -d)"
+  commit="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+  rc=0
+  python3 "$DEPS_EXPORTER" --context "${ROOT}/${ctx}" --context-name "$ctx" \
+    --repo narella-io/novu --commit "$commit" --output "${out}/deps.json" "$@" || rc=$?
+  if [[ $rc -eq 3 ]]; then
+    echo "DEPS-ATTACH SKIPPED: no supported lockfile in ${ctx}; ${ref} provenance stays UNKNOWN"
+    rm -rf "$out"; return 0
+  elif [[ $rc -ne 0 ]]; then
+    echo "DEPS-ATTACH FAILED: exporter exited ${rc} for ${ctx}; ${ref} has no deps.json" >&2
+    rm -rf "$out"; return 0
+  fi
+  # The digest, never the tag: tags here are re-pushed (ONLY=... rebuilds), digests are
+  # what got scanned.
+  if ! digest="$(oras resolve "$ref")"; then
+    echo "DEPS-ATTACH FAILED: cannot resolve ${ref}" >&2
+    rm -rf "$out"; return 0
+  fi
+  if (cd "$out" && oras attach --artifact-type "$DEPS_TYPE" "${ref%:*}@${digest}" "deps.json:${DEPS_TYPE}"); then
+    echo "DEPS-ATTACH OK: ${ref%:*}@${digest}"
+  else
+    echo "DEPS-ATTACH FAILED: oras attach refused for ${ref%:*}@${digest}" >&2
+  fi
+  rm -rf "$out"
+  return 0
+}
+
 if want api; then
 echo "=== building ${PREFIX}-api:${TAG} (fork: de-brand + Google OAuth + telemetry) ==="
 stream_build apps/api/Dockerfile \
@@ -83,6 +138,7 @@ stream_build apps/api/Dockerfile \
   --build-arg PACKAGE_PATH=apps/api \
   -t "${PREFIX}-api:${TAG}" \
   --push
+attach_deps "${PREFIX}-api:${TAG}" . --importer apps/api
 fi
 
 if want dashboard; then
@@ -96,6 +152,7 @@ docker buildx build \
   -t "${PREFIX}-dashboard:${TAG}" \
   --push \
   "$ROOT"
+attach_deps "${PREFIX}-dashboard:${TAG}" . --importer apps/dashboard
 fi
 
 if want worker; then
@@ -107,6 +164,7 @@ stream_build apps/worker/Dockerfile \
   --build-arg PACKAGE_PATH=apps/worker \
   -t "${PREFIX}-worker:${TAG}" \
   --push
+attach_deps "${PREFIX}-worker:${TAG}" . --importer apps/worker
 fi
 
 if want ws; then
@@ -118,6 +176,7 @@ stream_build apps/ws/Dockerfile \
   --build-arg PACKAGE_PATH=apps/ws \
   -t "${PREFIX}-ws:${TAG}" \
   --push
+attach_deps "${PREFIX}-ws:${TAG}" . --importer apps/ws
 fi
 
 if want mcp; then
@@ -128,6 +187,7 @@ docker buildx build \
   -t "${PREFIX}-mcp:${TAG}" \
   --push \
   "${ROOT}/narella-mcp"
+attach_deps "${PREFIX}-mcp:${TAG}" narella-mcp
 fi
 
 echo "DONE: ${PREFIX}-{api,dashboard,worker,ws,mcp}:${TAG} (ONLY=${ONLY:-all})"
