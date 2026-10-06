@@ -104,20 +104,37 @@ attach_deps() {
   fi
   out="$(mktemp -d)"
   commit="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+  # The digest, never the tag: tags here are re-pushed (ONLY=... rebuilds), digests are
+  # what got scanned.
+  if ! digest="$(oras resolve "$ref")"; then
+    echo "DEPS-ATTACH FAILED: cannot resolve ${ref}" >&2
+    rm -rf "$out"; return 0
+  fi
+  # PREFER THE IMAGE'S OWN LOCK. `pnpm deploy` re-resolves the deployment and leaves the
+  # result at node_modules/.pnpm/lock.yaml, and that lock is exact: against
+  # v3.18.0-narella.14 it gave 0 shipped packages labelled dev and 0 shipped packages
+  # missing for api, ws and worker. The source pnpm-lock.yaml names the right packages
+  # but, for a few dozen, the wrong VERSION (vite's optional peer jiti is 2.6.1 there and
+  # 1.21.0 in the image). The source lock is only the fallback, e.g. for the dashboard,
+  # whose nginx image has no node_modules.
+  local src_ctx="${ROOT}/${ctx}" cid
+  if [[ "$ctx" == "." ]] && cid="$(docker create --platform linux/amd64 "${ref%:*}@${digest}" 2>/dev/null)"; then
+    mkdir -p "${out}/deployed"
+    if docker cp "${cid}:/usr/src/app/node_modules/.pnpm/lock.yaml" "${out}/deployed/pnpm-lock.yaml" >/dev/null 2>&1; then
+      src_ctx="${out}/deployed"
+    else
+      echo "DEPS-ATTACH WARNING: no node_modules/.pnpm/lock.yaml in ${ref}; using the source pnpm-lock.yaml (versions may differ from the image)" >&2
+    fi
+    docker rm "$cid" >/dev/null 2>&1 || true
+  fi
   rc=0
-  python3 "$DEPS_EXPORTER" --context "${ROOT}/${ctx}" --context-name "$ctx" \
+  python3 "$DEPS_EXPORTER" --context "$src_ctx" --context-name "$ctx" \
     --repo narella-io/novu --commit "$commit" --output "${out}/deps.json" "$@" || rc=$?
   if [[ $rc -eq 3 ]]; then
     echo "DEPS-ATTACH SKIPPED: no supported lockfile in ${ctx}; ${ref} provenance stays UNKNOWN"
     rm -rf "$out"; return 0
   elif [[ $rc -ne 0 ]]; then
     echo "DEPS-ATTACH FAILED: exporter exited ${rc} for ${ctx}; ${ref} has no deps.json" >&2
-    rm -rf "$out"; return 0
-  fi
-  # The digest, never the tag: tags here are re-pushed (ONLY=... rebuilds), digests are
-  # what got scanned.
-  if ! digest="$(oras resolve "$ref")"; then
-    echo "DEPS-ATTACH FAILED: cannot resolve ${ref}" >&2
     rm -rf "$out"; return 0
   fi
   if (cd "$out" && oras attach --artifact-type "$DEPS_TYPE" "${ref%:*}@${digest}" "deps.json:${DEPS_TYPE}"); then

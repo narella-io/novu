@@ -32,7 +32,7 @@ import tomllib
 from collections import deque
 from dataclasses import dataclass, field
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SCHEMA = "narella-deps/v1"
 
 MAX_PATHS = 3
@@ -509,13 +509,39 @@ def _pnpm_target(dep_name: str, ref: str) -> str | None:
     return f"{dep_name}@{ref}"
 
 
-def parse_pnpm_lock(text: str, importers: list[str] | None = None) -> Graph:
+def _workspace_peers(context: str | None, imp: str) -> set[str] | None:
+    """Names in `<context>/<imp>/package.json` peerDependencies, or None when unreadable."""
+    if context is None:
+        return None
+    try:
+        with open(os.path.join(context, imp, "package.json"), encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return None
+    peers = manifest.get("peerDependencies") or {}
+    return set(peers) if isinstance(peers, dict) else None
+
+
+def parse_pnpm_lock(text: str, importers: list[str] | None = None, context: str | None = None) -> Graph:
     """pnpm-lock.yaml v9 -> Graph.
 
-    `importers` -> direct deps (dependencies/optionalDependencies prod,
-    devDependencies dev); `snapshots` -> the graph. With `importers` given, only those
-    importers and the workspace packages they `link:` to (prod side) are roots — the
-    view of one deployable app in a monorepo.
+    `importers` -> direct deps; `snapshots` -> the graph. With `importers` given, only
+    those importers and the workspace packages they `link:` to (prod side) are roots —
+    the view of one deployable app in a monorepo, i.e. what `pnpm deploy --prod` ships.
+
+    Per importer:
+      * `dependencies` / `optionalDependencies` are prod roots;
+      * a `devDependencies` entry that is ALSO one of the importer's own peerDependencies
+        (read from `<context>/<importer>/package.json`) is a prod root: pnpm installs a
+        workspace package's peers — optional ones included — into a deployment, resolved
+        to the version the workspace developed against (`@novu/framework`'s optional
+        peer `@vercel/node` ships in the novu-api image);
+      * any other `devDependencies` entry is a dev root for a SELECTED importer and is
+        ignored for a workspace package that is only linked in. A linked package's dev
+        tooling is never installed into the app.
+    When a linked package's package.json cannot be read, its peers are unknowable, so
+    ALL its devDependencies are treated as prod roots: over-listing is safe, labelling a
+    shipped package "dev" is not.
     """
     doc = parse_yaml_subset(text)
     ver = str(doc.get("lockfileVersion", ""))
@@ -528,9 +554,23 @@ def parse_pnpm_lock(text: str, importers: list[str] | None = None) -> Graph:
     def link_target(imp: str, ref: str) -> str:
         return os.path.normpath(os.path.join(imp, ref[len("link:") :])).replace(os.sep, "/")
 
+    peers: dict[str, set[str] | None] = {imp: _workspace_peers(context, imp) for imp in imps}
+
+    def shipped_fields(imp: str) -> list[tuple[str, dict]]:
+        """(name, spec) pairs a deployment of `imp` installs: deps, optional deps, and
+        the devDependencies that resolve its peers."""
+        body = imps[imp]
+        out = [(n, sp) for f in ("dependencies", "optionalDependencies") for n, sp in (body.get(f) or {}).items()]
+        pe = peers[imp]
+        for n, sp in (body.get("devDependencies") or {}).items():
+            if pe is None and imp not in selected or pe is not None and n in pe:
+                out.append((n, sp))
+        return out
+
     if importers:
+        selected = {os.path.normpath(i).replace(os.sep, "/") for i in importers}
         chosen: set[str] = set()
-        work = deque(os.path.normpath(i).replace(os.sep, "/") for i in importers)
+        work = deque(sorted(selected))
         while work:
             imp = work.popleft()
             if imp in chosen:
@@ -538,12 +578,12 @@ def parse_pnpm_lock(text: str, importers: list[str] | None = None) -> Graph:
             if imp not in imps:
                 raise ExportError(f"pnpm-lock.yaml: importer {imp!r} not in lockfile")
             chosen.add(imp)
-            for f in ("dependencies", "optionalDependencies"):
-                for spec in (imps[imp].get(f) or {}).values():
-                    ref = spec.get("version", "") if isinstance(spec, dict) else ""
-                    if ref.startswith("link:"):
-                        work.append(link_target(imp, ref))
+            for _n, spec in shipped_fields(imp):
+                ref = spec.get("version", "") if isinstance(spec, dict) else ""
+                if ref.startswith("link:"):
+                    work.append(link_target(imp, ref))
     else:
+        selected = set(imps)
         chosen = set(imps)
 
     g = Graph()
@@ -561,17 +601,64 @@ def parse_pnpm_lock(text: str, importers: list[str] | None = None) -> Graph:
                 if tgt not in snaps:
                     raise ExportError(f"pnpm-lock.yaml: {skey} -> {tgt} has no snapshot")
                 g.add_edge(sk, _pnpm_split(tgt))
+    def root(imp: str, dep: str, spec) -> Key | None:
+        ref = str(spec.get("version", "")) if isinstance(spec, dict) else ""
+        tgt = _pnpm_target(dep, ref) if ref else None
+        if tgt is None:
+            return None
+        if tgt not in snaps:
+            raise ExportError(f"pnpm-lock.yaml: importer {imp} -> {tgt} has no snapshot")
+        return _pnpm_split(tgt)
+
     for imp in sorted(chosen):
-        for f in ("dependencies", "optionalDependencies", "devDependencies"):
-            for dep, spec in sorted((imps[imp].get(f) or {}).items()):
-                ref = str(spec.get("version", "")) if isinstance(spec, dict) else ""
-                tgt = _pnpm_target(dep, ref) if ref else None
-                if tgt is None:
-                    continue
-                if tgt not in snaps:
-                    raise ExportError(f"pnpm-lock.yaml: importer {imp} -> {tgt} has no snapshot")
-                (g.dev_roots if f == "devDependencies" else g.prod_roots).add(_pnpm_split(tgt))
+        prod_names = set()
+        for dep, spec in sorted(shipped_fields(imp)):
+            prod_names.add(dep)
+            k = root(imp, dep, spec)
+            if k is not None:
+                g.prod_roots.add(k)
+        if imp not in selected:
+            continue  # a linked workspace's own dev tooling never reaches the app
+        for dep, spec in sorted((imps[imp].get("devDependencies") or {}).items()):
+            if dep in prod_names:
+                continue
+            k = root(imp, dep, spec)
+            if k is not None:
+                g.dev_roots.add(k)
+    _contract_injected(g, set(imps))
     return g
+
+
+def _contract_injected(g: Graph, workspace_dirs: set[str]) -> None:
+    """Remove INJECTED workspace packages (`name@file:<workspace dir>`) from the graph.
+
+    `pnpm deploy` copies workspace packages in as `file:` snapshots instead of `link:`s,
+    and the lockfile it leaves at node_modules/.pnpm/lock.yaml records them that way. They
+    are our code, like a linked importer: a root that reaches one reaches its
+    dependencies DIRECTLY, and a chain passing through one skips over it.
+    """
+    injected = sorted(
+        k for k in g.nodes if k[1].startswith("file:") and os.path.normpath(k[1][len("file:") :]).replace(os.sep, "/") in workspace_dirs
+    )
+    for n in injected:
+        prod_succ = g.prod_edges.pop(n, set())
+        all_succ = g.all_edges.pop(n, set())
+        for p in sorted(g.all_edges):
+            if n not in g.all_edges[p]:
+                continue
+            via_prod = n in g.prod_edges.get(p, set())
+            g.all_edges[p].discard(n)
+            g.prod_edges.get(p, set()).discard(n)
+            for s in all_succ:
+                g.add_edge(p, s, prod=via_prod and s in prod_succ)
+        if n in g.prod_roots:
+            g.prod_roots.discard(n)
+            g.prod_roots |= prod_succ
+            g.dev_roots |= all_succ - prod_succ
+        if n in g.dev_roots:
+            g.dev_roots.discard(n)
+            g.dev_roots |= all_succ
+        g.nodes.discard(n)
 
 
 # --------------------------------------------------------------------------------------
@@ -676,7 +763,7 @@ def export(context: str, context_name: str, importers: list[str] | None = None) 
             }
         )
     if have("pnpm-lock.yaml"):
-        g = parse_pnpm_lock(_read(os.path.join(context, "pnpm-lock.yaml")), importers)
+        g = parse_pnpm_lock(_read(os.path.join(context, "pnpm-lock.yaml")), importers, context)
         ecos.append(
             {
                 "ecosystem": "npm",
