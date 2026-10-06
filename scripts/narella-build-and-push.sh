@@ -47,7 +47,17 @@ aws ecr get-login-password --region "$REGION" | docker login --username AWS --pa
 
 # Empty BullMQ-Pro token file => community build (the Dockerfile branches on it).
 EMPTY_SECRET="$(mktemp)"
-trap 'rm -f "$EMPTY_SECRET"' EXIT
+# deps.json scratch state (attach_deps, below). Global so the traps can clean up a temp
+# container or directory left behind by an interrupted attach.
+DEPS_CID=""
+DEPS_OUT=""
+deps_cleanup() {
+  if [[ -n "$DEPS_CID" ]]; then docker rm -f "$DEPS_CID" >/dev/null 2>&1 || true; DEPS_CID=""; fi
+  if [[ -n "$DEPS_OUT" ]]; then rm -rf "$DEPS_OUT"; DEPS_OUT=""; fi
+}
+trap 'rm -f "$EMPTY_SECRET"; deps_cleanup' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Upstream CI does this copy before building (see .github/workflows/deploy.yml):
 cp scripts/dotenvcreate.mjs apps/api/src/dotenvcreate.mjs
@@ -102,47 +112,65 @@ attach_deps() {
     echo "DEPS-ATTACH FAILED: python3 >= 3.11 needed for the exporter; ${ref} has no deps.json" >&2
     return 0
   fi
-  out="$(mktemp -d)"
+  out="$(mktemp -d)"; DEPS_OUT="$out"
   commit="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
   # The digest, never the tag: tags here are re-pushed (ONLY=... rebuilds), digests are
   # what got scanned.
   if ! digest="$(oras resolve "$ref")"; then
     echo "DEPS-ATTACH FAILED: cannot resolve ${ref}" >&2
-    rm -rf "$out"; return 0
+    deps_cleanup; return 0
   fi
   # PREFER THE IMAGE'S OWN LOCK. `pnpm deploy` re-resolves the deployment and leaves the
   # result at node_modules/.pnpm/lock.yaml, and that lock is exact: against
   # v3.18.0-narella.14 it gave 0 shipped packages labelled dev and 0 shipped packages
-  # missing for api, ws and worker. The source pnpm-lock.yaml names the right packages
-  # but, for a few dozen, the wrong VERSION (vite's optional peer jiti is 2.6.1 there and
-  # 1.21.0 in the image). The source lock is only the fallback, e.g. for the dashboard,
-  # whose nginx image has no node_modules.
-  local src_ctx="${ROOT}/${ctx}" cid
-  if [[ "$ctx" == "." ]] && cid="$(docker create --platform linux/amd64 "${ref%:*}@${digest}" 2>/dev/null)"; then
+  # missing for api, ws and worker. An export from the source pnpm-lock.yaml gets a few
+  # dozen VERSIONS wrong (vite's optional peer jiti is 2.6.1 there, 1.21.0 in the image)
+  # and can miss names outright (browser-process-hrtime and w3c-hr-time on api). So EVERY
+  # fallback to the source lock says so, with the reason, and the document records which
+  # lock it came from (source.lock_origin) so a reader can tell exact from approximate.
+  #
+  # narella-mcp (ctx != .) is a plain `npm ci` from its own package-lock.json: that lock
+  # IS what the image installs, so it is recorded as `source` without a warning.
+  local src_ctx="${ROOT}/${ctx}" origin=source lock_path="pnpm-lock.yaml" reason=""
+  local image_lock=/usr/src/app/node_modules/.pnpm/lock.yaml
+  if [[ "$ctx" != "." ]]; then
+    lock_path="${ctx%/}/package-lock.json"
+  elif ! command -v docker >/dev/null; then
+    reason="docker not on PATH"
+  elif ! DEPS_CID="$(docker create --platform linux/amd64 "${ref%:*}@${digest}" 2>"${out}/docker.err")" || [[ -z "$DEPS_CID" ]]; then
+    DEPS_CID=""
+    reason="docker create ${ref%:*}@${digest} failed: $(head -c 300 "${out}/docker.err" | tr '\n' ' ')"
+  else
     mkdir -p "${out}/deployed"
-    if docker cp "${cid}:/usr/src/app/node_modules/.pnpm/lock.yaml" "${out}/deployed/pnpm-lock.yaml" >/dev/null 2>&1; then
-      src_ctx="${out}/deployed"
+    if docker cp "${DEPS_CID}:${image_lock}" "${out}/deployed/pnpm-lock.yaml" 2>"${out}/docker.err" >/dev/null; then
+      src_ctx="${out}/deployed"; origin=image; lock_path="$image_lock"
     else
-      echo "DEPS-ATTACH WARNING: no node_modules/.pnpm/lock.yaml in ${ref}; using the source pnpm-lock.yaml (versions may differ from the image)" >&2
+      reason="no ${image_lock} in the image: $(head -c 300 "${out}/docker.err" | tr '\n' ' ')"
     fi
-    docker rm "$cid" >/dev/null 2>&1 || true
+    docker rm -f "$DEPS_CID" >/dev/null 2>&1 || true
+    DEPS_CID=""
+  fi
+  if [[ -n "$reason" ]]; then
+    echo "DEPS-ATTACH WARNING: could not read the image lock (${reason}), falling back to the source lock" >&2
+    if [[ -s "${out}/docker.err" ]]; then sed 's/^/  docker: /' "${out}/docker.err" >&2; fi
   fi
   rc=0
   python3 "$DEPS_EXPORTER" --context "$src_ctx" --context-name "$ctx" \
-    --repo narella-io/novu --commit "$commit" --output "${out}/deps.json" "$@" || rc=$?
+    --repo narella-io/novu --commit "$commit" --output "${out}/deps.json" \
+    --lock-origin "$origin" --lock-path "$lock_path" "$@" || rc=$?
   if [[ $rc -eq 3 ]]; then
     echo "DEPS-ATTACH SKIPPED: no supported lockfile in ${ctx}; ${ref} provenance stays UNKNOWN"
-    rm -rf "$out"; return 0
+    deps_cleanup; return 0
   elif [[ $rc -ne 0 ]]; then
     echo "DEPS-ATTACH FAILED: exporter exited ${rc} for ${ctx}; ${ref} has no deps.json" >&2
-    rm -rf "$out"; return 0
+    deps_cleanup; return 0
   fi
   if (cd "$out" && oras attach --artifact-type "$DEPS_TYPE" "${ref%:*}@${digest}" "deps.json:${DEPS_TYPE}"); then
-    echo "DEPS-ATTACH OK: ${ref%:*}@${digest}"
+    echo "DEPS-ATTACH OK: ${ref%:*}@${digest} (lock_origin=${origin})"
   else
     echo "DEPS-ATTACH FAILED: oras attach refused for ${ref%:*}@${digest}" >&2
   fi
-  rm -rf "$out"
+  deps_cleanup
   return 0
 }
 

@@ -32,7 +32,7 @@ import tomllib
 from collections import deque
 from dataclasses import dataclass, field
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SCHEMA = "narella-deps/v1"
 
 MAX_PATHS = 3
@@ -789,11 +789,27 @@ def export(context: str, context_name: str, importers: list[str] | None = None) 
     return ecos
 
 
-def render(ecosystems: list[dict], repo: str | None, commit: str | None, context_name: str) -> str:
+LOCK_ORIGINS = ("image", "source")
+
+
+def render(
+    ecosystems: list[dict],
+    repo: str | None,
+    commit: str | None,
+    context_name: str,
+    lock_origin: str | None = None,
+    lock_path: str | None = None,
+) -> str:
+    source: dict = {"repo": repo or None, "commit": commit or None, "context": context_name}
+    # Additive (v1): present only when the producer says where the lock came from, so a
+    # document written without it is byte-identical to before. Absent = not stated.
+    if lock_origin is not None:
+        source["lock_origin"] = lock_origin
+        source["lock_path"] = lock_path or None
     doc = {
         "schema": SCHEMA,
         "generated_by": f"narella-deps-export {VERSION}",
-        "source": {"repo": repo or None, "commit": commit or None, "context": context_name},
+        "source": source,
         "ecosystems": ecosystems,
     }
     return json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
@@ -816,6 +832,14 @@ def main(argv: list[str] | None = None) -> int:
         help="npm/pnpm workspaces only: restrict direct deps to this importer (repeatable) "
         "and the workspace packages it links to. Default: every importer.",
     )
+    ap.add_argument(
+        "--lock-origin",
+        choices=LOCK_ORIGINS,
+        help="record where the lockfile came from: `image` = read out of the built image "
+        "(e.g. pnpm deploy's node_modules/.pnpm/lock.yaml), `source` = the repository's own "
+        "lockfile. Written as source.lock_origin; omitted when not given.",
+    )
+    ap.add_argument("--lock-path", help="with --lock-origin: the lockfile's path (in-image path for `image`)")
     ap.add_argument("--output", help="write here (only on success) instead of stdout")
     args = ap.parse_args(argv)
 
@@ -834,7 +858,9 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return EXIT_NO_LOCKFILE
-    out = render(ecos, args.repo, args.commit, name)
+    if args.lock_path and not args.lock_origin:
+        ap.error("--lock-path needs --lock-origin")
+    out = render(ecos, args.repo, args.commit, name, args.lock_origin, args.lock_path)
     if args.output:
         tmp = args.output + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
