@@ -158,6 +158,24 @@ overrides:
   # required at build/test time. Strip the transitive aws-sdk to remove the
   # advisory from our dependency graph.
   aws-lambda>aws-sdk: '-'
+  # narella (2026-10 no-fix round): braces <=3.0.3 (CVE-2026-93687, GHSA-vfj7-8cjw-p6xm) has
+  # no fixed release. Every api/worker/ws image reached it ONLY through nest-raven's OPTIONAL
+  # dependency @nestjs/graphql 12 (chokidar 3 + fast-glob -> micromatch -> braces). nest-raven
+  # loads it inside try/catch (dist/raven.interceptor.js) for GraphQL contexts; nothing in this
+  # fork imports @nestjs/graphql or serves GraphQL, so strip it and the whole subtree with it.
+  nest-raven>@nestjs/graphql: '-'
+  # Second braces path, invisible in the lockfile: `pnpm deploy` injects @novu/framework and
+  # resolves its OPTIONAL peer @vercel/node from the framework's devDependencies, so every image
+  # ships @vercel/node -> ts-morph 12 -> @ts-morph/common -> fast-glob -> micromatch -> braces.
+  # The framework imports @vercel/node for TYPES only (VercelRequest/VercelResponse; its .d.ts
+  # never references ts-morph). ts-morph is used only by Vercel's builder/dev-server code paths,
+  # which nothing here runs.
+  '@vercel/node>ts-morph': '-'
+  '@vercel/static-config>ts-morph': '-'
+  # narella (2026-10 fixable round on novu#3): parents' ranges already admit the fixed versions
+  # (express 4 `~2.0.7`, express 5 `^2.0.7`; postcss 8.5.28 `^1.2.1`).
+  proxy-addr@>=1.1.0 <2.0.8: ^2.0.8
+  source-map-js@>=1.0.0 <1.2.2: ^1.2.2
   esbuild@<0.28.1: ^0.28.1
   follow-redirects@<=1.15.11: ^1.16.0
   hono@<4.13.7: ^4.13.7
