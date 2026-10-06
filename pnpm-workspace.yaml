@@ -172,6 +172,10 @@ overrides:
   # which nothing here runs.
   '@vercel/node>ts-morph': '-'
   '@vercel/static-config>ts-morph': '-'
+  # narella (2026-10 fixable round on novu#3): parents' ranges already admit the fixed versions
+  # (express 4 `~2.0.7`, express 5 `^2.0.7`; postcss 8.5.28 `^1.2.1`).
+  proxy-addr@>=1.1.0 <2.0.8: ^2.0.8
+  source-map-js@>=1.0.0 <1.2.2: ^1.2.2
   esbuild@<0.28.1: ^0.28.1
   follow-redirects@<=1.15.11: ^1.16.0
   hono@<4.13.7: ^4.13.7

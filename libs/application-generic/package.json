@@ -52,7 +52,6 @@
     "@novu/providers": "workspace:*",
     "@novu/shared": "workspace:*",
     "@novu/stateless": "workspace:*",
-    "@novu/testing": "workspace:*",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/auto-instrumentations-node": "0.75.0",
     "@opentelemetry/context-async-hooks": "2.7.1",
@@ -126,6 +125,7 @@
   },
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^1.0.1",
+    "@novu/testing": "workspace:*",
     "@types/got": "^9.6.12",
     "@types/jest": "29.5.2",
     "@types/json-logic-js": "^2.0.8",
