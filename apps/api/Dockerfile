@@ -67,7 +67,7 @@ RUN apk upgrade --no-cache && \
     # chokidar 4.0.3 (deps: readdirp only) drops braces 3.0.3 (CVE-2026-93687, no fixed release);
     # pm2 calls chokidar.watch only from lib/Watcher.js for --watch, which this entrypoint never sets.
     mkdir -p /opt/pm2 && cd /opt/pm2 && \
-    echo '{"private":true,"dependencies":{"pm2":"6.0.14"},"overrides":{"js-yaml":"4.3.2","basic-ftp":"6.2.1","chokidar":"4.0.3"}}' > package.json && \
+    echo '{"private":true,"dependencies":{"pm2":"7.0.4"},"overrides":{"js-yaml":"4.3.2","basic-ftp":"6.2.1","chokidar":"4.0.3"}}' > package.json && \
     npm --no-update-notifier --no-fund --no-audit install --omit=dev && \
     npm cache clean --force && \
     for b in pm2 pm2-runtime pm2-dev pm2-docker; do ln -s /opt/pm2/node_modules/pm2/bin/$b /usr/local/bin/$b; done && \

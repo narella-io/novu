@@ -140,7 +140,8 @@ export function startOtel(serviceName: string, version: string): NodeSDK | undef
    * forward every pino log record to this exporter automatically.
    */
   const logRecordProcessors =
-    process.env.ENABLE_OTEL_LOGS === 'true' ? [new BatchLogRecordProcessor(new OTLPLogExporter())] : [];
+    // narella: sdk-logs 0.221 takes an options object ({ exporter }) instead of a positional exporter.
+    process.env.ENABLE_OTEL_LOGS === 'true' ? [new BatchLogRecordProcessor({ exporter: new OTLPLogExporter() })] : [];
 
   sdk = new NodeSDK({
     resource: buildResource(serviceName, version),

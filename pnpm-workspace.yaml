@@ -28,7 +28,7 @@ enablePrePostScripts: true
 
 # Settings migrated from package.json#pnpm (pnpm v11 no longer reads the `pnpm` field).
 overrides:
-  body-parser@<1.20.3: ^1.20.3
+  body-parser@<1.20.6: ^1.20.6
   handlebars@<4.7.9: 4.7.9
   braces@<3.0.3: ^3.0.3
   file-type@>=13.0.0 <16.5.4: ^16.5.4
@@ -227,6 +227,16 @@ overrides:
   baseline-browser-mapping@<2.11.0: ^2.11.0
   moment@<2.31.0: ^2.31.0
   '@opentelemetry/propagator-jaeger@<2.9.0': ^2.9.0
+  # narella (2026-10 all-severities round). @ai-sdk/provider-utils 4.0.6-4.0.30 (CVE-2026-8769,
+  # Low) reach the images through ai@6 / @ai-sdk/{anthropic,openai,gateway} exact pins; 4.0.33 is
+  # the first fixed 4.x and keeps the 4.x API those parents were built against.
+  '@ai-sdk/provider-utils@>=4.0.0 <4.0.33': 4.0.33
+  # fast-copy 3.0.1 (GHSA-jggr-w7fw-pc2j) via pino-pretty 9 (`^3.0.0`).
+  fast-copy@>=3.0.0 <3.1.0: ^3.1.0
+  # sprintf-js 1.0.3 (CVE-2026-97058, no fixed release) arrives only as json-schema-faker ->
+  # json-schema-ref-parser 6 -> js-yaml 3 -> argparse 1 -> sprintf-js. js-yaml 3 requires argparse
+  # from bin/js-yaml.js (its CLI) and nowhere in lib/, and nothing here runs that CLI.
+  js-yaml@3>argparse: '-'
   # Force single instances of @codemirror/state and @codemirror/autocomplete.
   # Without this, transitive lang-* packages pin to state@6.4.1 while direct
   # dashboard imports resolve against state@6.6.0, producing two virtual peer
