@@ -35,5 +35,13 @@ upgrades are cherry-picks onto a new tag branch:
     pnpm install --ignore-scripts    # once; NODE_OPTIONS=--max-old-space-size=8192 if OOM
     ./scripts/narella-build-and-push.sh v3.18.0-narella.N
 
-api+dashboard+worker build from the fork (worker carries the SES-IRSA provider); ws mirrors upstream;
-narella-mcp builds separately from narella-mcp/Dockerfile.
+Every image builds from the fork: api, dashboard, worker (carries the SES-IRSA provider), ws,
+and mcp (narella-mcp/Dockerfile). ws stopped being an upstream mirror in v3.18.0-narella.14 —
+a mirror cannot carry a dependency fix. `ONLY="ws mcp"` builds a subset.
+
+Dependency security fixes go in `pnpm-workspace.yaml` `overrides:` (pnpm 11 ignores
+package.json#pnpm), range-scoped so they only lift vulnerable versions, then
+`NODE_OPTIONS=--max-old-space-size=8192 corepack pnpm install --ignore-scripts` (pnpm 11.0.9;
+the nvm global pnpm is 9 and must not write the lockfile). narella-mcp has its own npm
+lockfile (force-added; `.gitignore` hides package-lock.json) and `overrides`; smoke it with
+`narella-mcp/test/smoke.sh` after `npm ci`.
