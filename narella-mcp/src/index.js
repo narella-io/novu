@@ -202,7 +202,7 @@ function buildMcpServer() {
   server.tool(
     'create_workflow',
     'Create a workflow. `definition` is the Novu v2 workflow DTO: {name, workflowId, description?, tags?, steps: [{name, type: in_app|email|delay|digest|sms|push|chat, controlValues: {...}}]}. Email controlValues: {subject, body(Maily JSON or simple)}. Delay controlValues: {amount, unit: seconds|minutes|hours|days}.',
-    { definition: z.record(z.unknown()).describe('Full v2 workflow DTO') },
+    { definition: z.record(z.string(), z.unknown()).describe('Full v2 workflow DTO') },
     async ({ definition }) => asText(await novu('POST', '/v2/workflows', definition))
   );
 
@@ -211,7 +211,7 @@ function buildMcpServer() {
     'Update an existing workflow with a full v2 workflow DTO (PUT semantics — send the complete definition).',
     {
       workflowId: z.string(),
-      definition: z.record(z.unknown()).describe('Full v2 workflow DTO'),
+      definition: z.record(z.string(), z.unknown()).describe('Full v2 workflow DTO'),
     },
     async ({ workflowId, definition }) =>
       asText(await novu('PUT', `/v2/workflows/${encodeURIComponent(workflowId)}`, definition))
@@ -255,7 +255,7 @@ function buildMcpServer() {
       workflowId: z.string(),
       subscriberId: z.string().describe('Subscriber id, e.g. waitlist-1'),
       email: z.string().optional().describe('Subscriber email (upserted on trigger)'),
-      payload: z.record(z.unknown()).optional(),
+      payload: z.record(z.string(), z.unknown()).optional(),
     },
     async ({ workflowId, subscriberId, email, payload }) =>
       asText(
