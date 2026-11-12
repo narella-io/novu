@@ -93,6 +93,20 @@ overrides:
   # the api/worker/ws images where nothing imports it. Drop that one edge (framework
   # keeps its own devDependency on it for the sveltekit adapter build).
   better-auth>@sveltejs/kit: '-'
+  # narella (2026-11-11, run 948, v3.18.0-narella.20 images). glob 10.5.0 (-> 14.0.2) and
+  # minimatch 9.0.9 (-> 11.0.1) reached api/worker/ws by exactly ONE runtime chain:
+  # gcp-metadata 8 -> gaxios 7.1.3 -> rimraf 5.0.10 -> glob 10 -> minimatch 9.
+  # gaxios 7.1.3 declared rimraf as a dependency but never requires it (no `rimraf` in build/);
+  # gaxios 7.1.4 dropped the declaration and its build/ is byte-identical to 7.1.3 (diffed, minus
+  # tsbuildinfo/maps). Exact 7.1.4 so this is a manifest-only change. Every other glob@10/minimatch@9
+  # dependent (jest, nx, typescript-eslint, sucrase, typedoc, @swc/cli, ts-morph) is dev tooling
+  # that `pnpm deploy --prod` does not ship.
+  gaxios@>=7.0.0 <8.0.0: 7.1.4
+  # lodash.omit 4.5.0 (2016) via @vonage/numbers and @vonage/verify 1.9.0 (`lodash.omit: ^4.5.0`),
+  # which @vonage/server-sdk loads eagerly for the nexmo SMS provider: runtime-reachable, so not
+  # removable. lodash.omit 4.18.0 (lodash/lodash, 2026-03-31) is the fixed modularized release,
+  # still a dependency-free CommonJS `module.exports = omit`.
+  lodash.omit: ^4.18.0
   seroval@<1.4.1: ^1.4.1
   h3@<1.15.9: ^1.15.9
   immutable@>=4.0.0 <4.3.8: ^4.3.8
