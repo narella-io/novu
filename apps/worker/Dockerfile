@@ -58,6 +58,19 @@ RUN --mount=type=secret,id=BULL_MQ_PRO_NPM_TOKEN,uid=1000 export BULL_MQ_PRO_NPM
       mv node_modules /usr/src/deploy/node_modules/@taskforcesh/bullmq-pro/node_modules; \
     fi
 
+# narella (2026-11-11, run 948): @sveltejs/kit 2.70.3 (2 rows, fix only in kit 3.0) is an OPTIONAL
+# peer of @novu/framework and better-auth. `pnpm deploy` links it from framework's devDependency
+# (the sveltekit adapter build) into the virtual store even with `better-auth>@sveltejs/kit: '-'`.
+# Nothing at runtime loads it: framework references it only from dist/*/servers/sveltekit.d.ts
+# (types), better-auth's JS never imports it, and no app dist imports a sveltekit entry. Drop the
+# store copy and every symlink to it, and fail the build if any copy survives.
+RUN cd /usr/src/deploy/node_modules && \
+    find . -path '*/node_modules/@sveltejs/kit' -type l -exec rm {} + && \
+    find .pnpm -maxdepth 1 -type d -name '@sveltejs+kit@*' -exec rm -r {} + && \
+    if find . -path '*/node_modules/@sveltejs/kit/package.json' | grep .; then \
+      echo 'ERROR: @sveltejs/kit still in the deploy tree' >&2; exit 1; \
+    fi
+
 # ------- PRODUCTION BUILD ----------
 FROM node:22.22-alpine3.23 AS prod
 
